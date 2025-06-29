@@ -1,0 +1,158 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - internal/mocks
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - unparam
+    - nakedret
+    - prealloc
+    - copyloopvar
+    - gocritic
+    - gocyclo
+    - godot
+    - whitespace
+    - revive
+    - bodyclose
+    - noctx
+    - gosec
+    - exhaustive
+    - sqlclosecheck
+    - nilerr
+    - tparallel
+    - errorlint
+    - paralleltest
+    - makezero
+    - tenv
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  
+  govet:
+    check-shadowing: true
+    enable-all: true
+  
+  gocyclo:
+    min-complexity: 15
+  
+  misspell:
+    locale: US
+  
+  unparam:
+    check-exported: true
+  
+  nakedret:
+    max-func-lines: 30
+  
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
+  
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+  
+  godot:
+    scope: all
+    capital: true
+  
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G304 # File path provided as taint input
+      - G401 # Use of weak cryptographic primitive (we use bcrypt)
+      - G501 # Blocklisted import crypto/md5 (may be used for non-crypto purposes)
+      - G505 # Blocklisted import crypto/sha1 (may be used for non-crypto purposes)
+  
+  exhaustive:
+    default-signifies-exhaustive: true
+  
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - gosec
+        - paralleltest
+        - tparallel
+    
+    - path: cmd/
+      linters:
+        - gochecknoglobals
+    
+    - path: internal/test/
+      linters:
+        - gosec
+        - errcheck
+  
+  exclude-use-default: false
+  max-issues-per-linter: 50
+  max-same-issues: 3
+  
+  exclude:
+    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*print(f|ln)?|os\\.(Un)?Setenv). is not checked"
+    - "exported (type|method|function) (.+) should have comment or be unexported"
+    - "ST1000: at least one file in a package should have a package comment"
