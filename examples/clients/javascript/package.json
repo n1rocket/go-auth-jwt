@@ -1,0 +1,15 @@
+{
+  "name": "jwt-auth-client-example",
+  "version": "1.0.0",
+  "description": "Example JWT Auth Service client for Node.js",
+  "main": "auth-client.js",
+  "scripts": {
+    "start": "node auth-client.js",
+    "example": "node example-app.js"
+  },
+  "keywords": ["jwt", "auth", "client", "example"],
+  "author": "JWT Auth Team",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

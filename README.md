@@ -170,6 +170,34 @@ curl -X POST http://localhost:8080/login \
 }
 ```
 
+## 🗄️ Database Migrations
+
+The project includes a comprehensive migration system for managing database schema changes.
+
+```bash
+# Run all pending migrations
+make migrate-up
+
+# Rollback last migration
+make migrate-down
+
+# Create a new migration
+make migrate-create name=add_user_feature
+
+# Check migration status
+./scripts/migrate.sh status
+```
+
+### Migration Features
+
+- **File-based migrations**: Development flexibility with SQL files
+- **Embedded migrations**: Single binary deployment support
+- **Version tracking**: Full migration history and rollback capability
+- **CLI tool**: Standalone migration management tool
+- **Programmatic API**: Run migrations from code
+
+For detailed migration documentation, see [docs/MIGRATIONS.md](docs/MIGRATIONS.md).
+
 ## 🧪 Testing
 
 ```bash

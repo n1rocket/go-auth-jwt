@@ -1,0 +1,140 @@
+groups:
+  - name: jwt_auth_alerts
+    interval: 30s
+    rules:
+      # Service availability
+      - alert: ServiceDown
+        expr: up{job="jwt-auth-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: jwt-auth
+        annotations:
+          summary: "JWT Auth Service is down"
+          description: "The JWT Auth Service has been down for more than 1 minute."
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for the last 5 minutes."
+
+      # High login failure rate
+      - alert: HighLoginFailureRate
+        expr: |
+          rate(auth_login_failure_total[5m]) / rate(auth_login_attempts_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "High login failure rate"
+          description: "More than 50% of login attempts are failing."
+
+      # Too many active sessions
+      - alert: TooManyActiveSessions
+        expr: auth_active_sessions > 10000
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "Too many active sessions"
+          description: "Active sessions count is above 10,000."
+
+      # Database connection issues
+      - alert: DatabaseConnectionHigh
+        expr: db_connections_active > 20
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "High database connection count"
+          description: "Database connections are above 20."
+
+      # Database errors
+      - alert: DatabaseErrors
+        expr: rate(db_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "Database errors detected"
+          description: "Database error rate is above 0.1 per second."
+
+      # Email queue backup
+      - alert: EmailQueueBackup
+        expr: email_queue_size > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "Email queue is backing up"
+          description: "Email queue has more than 100 messages waiting."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: go_memory_allocated_bytes / 1024 / 1024 > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "High memory usage"
+          description: "Service is using more than 500MB of memory."
+
+      # Too many goroutines
+      - alert: TooManyGoroutines
+        expr: go_goroutines > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "Too many goroutines"
+          description: "Service has more than 1000 goroutines."
+
+      # Rate limit exceeded frequently
+      - alert: RateLimitExceeded
+        expr: |
+          rate(rate_limit_exceeded_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: info
+          service: jwt-auth
+        annotations:
+          summary: "Rate limits being exceeded"
+          description: "Rate limits are being exceeded more than once per second."
+
+      # Slow HTTP responses
+      - alert: SlowHTTPResponses
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "Slow HTTP responses"
+          description: "95th percentile response time is above 1 second."
+
+      # Certificate expiration (if using HTTPS)
+      - alert: CertificateExpiringSoon
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          service: jwt-auth
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate will expire in less than 30 days."

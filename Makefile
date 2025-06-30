@@ -99,6 +99,25 @@ compose-down: ## Stop services with docker-compose
 compose-logs: ## View docker-compose logs
 	docker compose logs -f
 
+.PHONY: dev-up
+dev-up: ## Start development environment with docker-compose
+	docker compose -f docker-compose.dev.yml up -d
+	@echo "Development environment started!"
+	@echo "API: http://localhost:8080"
+	@echo "MailHog: http://localhost:8025"
+
+.PHONY: dev-down
+dev-down: ## Stop development environment
+	docker compose -f docker-compose.dev.yml down
+
+.PHONY: dev-logs
+dev-logs: ## View development environment logs
+	docker compose -f docker-compose.dev.yml logs -f
+
+.PHONY: dev-clean
+dev-clean: ## Clean development environment (including volumes)
+	docker compose -f docker-compose.dev.yml down -v
+
 .PHONY: clean
 clean: ## Clean build artifacts
 	rm -rf bin/ dist/ coverage.* gosec-report.json

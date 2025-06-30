@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: go-auth-jwt
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - ingress.yaml
+  - hpa.yaml
+
+images:
+  - name: ghcr.io/abueno/go-auth-jwt
+    newTag: latest
+
+replicas:
+  - name: go-auth-jwt
+    count: 3
+
+configMapGenerator:
+  - name: go-auth-jwt-config
+    behavior: merge
+    envs:
+      - config.env
+
+secretGenerator:
+  - name: go-auth-jwt-secrets
+    behavior: merge
+    envs:
+      - secrets.env

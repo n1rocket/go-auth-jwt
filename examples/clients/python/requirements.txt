@@ -1,0 +1,4 @@
+requests>=2.28.0
+flask>=2.3.0
+flask-socketio>=5.3.0  # Optional, for WebSocket support
+python-dotenv>=1.0.0
