@@ -242,11 +242,24 @@ func TestEmailDispatcher_EnqueueWithContext(t *testing.T) {
 	})
 	
 	t.Run("context timeout", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
-		defer cancel()
+		// Create a dispatcher with a full queue to test timeout scenario
+		fullQueueConfig := Config{
+			Workers:     0, // No workers to prevent processing
+			QueueSize:   1,
+			MaxRetries:  2,
+			RetryDelay:  10 * time.Millisecond,
+			SendTimeout: 1 * time.Second,
+		}
+		fullDispatcher := NewEmailDispatcher(mockService, fullQueueConfig, logger)
+		fullDispatcher.Start()
+		defer fullDispatcher.Stop(1 * time.Second)
 		
-		// Wait for timeout
-		time.Sleep(5 * time.Millisecond)
+		// Fill the queue
+		fullDispatcher.Enqueue(email.Email{To: "filler@example.com", Subject: "Filler", Body: "Fill queue"})
+		
+		// Now try to enqueue with a short timeout - this should timeout waiting for space
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
 		
 		testEmail := email.Email{
 			To:      "timeout@example.com",
@@ -254,9 +267,9 @@ func TestEmailDispatcher_EnqueueWithContext(t *testing.T) {
 			Body:    "Test",
 		}
 		
-		err := dispatcher.EnqueueWithContext(ctx, testEmail)
-		if err == nil {
-			t.Error("Expected context deadline exceeded error")
+		err := fullDispatcher.EnqueueWithContext(ctx, testEmail)
+		if err != context.DeadlineExceeded {
+			t.Errorf("Expected context.DeadlineExceeded error, got %v", err)
 		}
 	})
 }

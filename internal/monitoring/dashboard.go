@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"net/http"
 	"time"
@@ -174,7 +173,7 @@ func (d *Dashboard) collectDashboardData() DashboardData {
 	return DashboardData{
 		Timestamp: time.Now().Unix(),
 		System: SystemMetrics{
-			GoRoutines:      getCounter(d.metrics.GoRoutines),
+			GoRoutines:      int64(getGauge(d.metrics.GoRoutines)),
 			MemoryAllocated: toMB(d.metrics.MemoryAllocated.Value()),
 			MemoryTotal:     toMB(d.metrics.MemoryTotal.Value()),
 			Uptime:          int64(time.Since(startTime).Seconds()),

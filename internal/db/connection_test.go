@@ -201,6 +201,46 @@ func TestDB_TestConnection(t *testing.T) {
 	}
 }
 
+func TestConnect(t *testing.T) {
+	tests := []struct {
+		name    string
+		dsn     string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "invalid DSN",
+			dsn:     "invalid://dsn",
+			wantErr: true,
+			errMsg:  "failed to ping database",
+		},
+		{
+			name:    "empty DSN",
+			dsn:     "",
+			wantErr: true,
+			errMsg:  "failed to ping database",
+		},
+		// Note: Actual connection tests would require a test database
+		// These would be in integration tests
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, err := Connect(tt.dsn)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Connect() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil && tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+				t.Errorf("Expected error containing %q, got %q", tt.errMsg, err.Error())
+			}
+			if db != nil {
+				db.Close()
+			}
+		})
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || (len(s) > 0 && len(substr) > 0 && findSubstring(s, substr) >= 0))

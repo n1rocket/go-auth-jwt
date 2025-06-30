@@ -70,8 +70,12 @@ func (g *Gauge) WithLabels(labels map[string]string) *LabeledGauge {
 	
 	if !exists {
 		g.mu.Lock()
-		lg = &labeledGauge{labels: labels}
-		g.labels[key] = lg
+		// Check again after acquiring write lock
+		lg, exists = g.labels[key]
+		if !exists {
+			lg = &labeledGauge{labels: labels}
+			g.labels[key] = lg
+		}
 		g.mu.Unlock()
 	}
 	

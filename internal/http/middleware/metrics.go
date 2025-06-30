@@ -8,19 +8,19 @@ import (
 	"github.com/abueno/go-auth-jwt/internal/metrics"
 )
 
-// responseWriter wraps http.ResponseWriter to capture status code and size
-type responseWriter struct {
+// metricsResponseWriter wraps http.ResponseWriter to capture status code and size
+type metricsResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	size       int
 }
 
-func (rw *responseWriter) WriteHeader(code int) {
+func (rw *metricsResponseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-func (rw *responseWriter) Write(data []byte) (int, error) {
+func (rw *metricsResponseWriter) Write(data []byte) (int, error) {
 	n, err := rw.ResponseWriter.Write(data)
 	rw.size += n
 	return n, err
@@ -38,7 +38,7 @@ func Metrics(m *metrics.Metrics) func(http.Handler) http.Handler {
 			start := time.Now()
 
 			// Wrap response writer
-			rw := &responseWriter{
+			rw := &metricsResponseWriter{
 				ResponseWriter: w,
 				statusCode:     http.StatusOK,
 			}

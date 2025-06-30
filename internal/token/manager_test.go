@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,9 +52,15 @@ func TestNewManager_RS256(t *testing.T) {
 	tempDir := t.TempDir()
 	privateKeyPath := filepath.Join(tempDir, "private.pem")
 	publicKeyPath := filepath.Join(tempDir, "public.pem")
+	invalidPrivateKeyPath := filepath.Join(tempDir, "invalid_private.pem")
+	invalidPublicKeyPath := filepath.Join(tempDir, "invalid_public.pem")
 
 	// Generate test keys
 	generateTestKeys(t, privateKeyPath, publicKeyPath)
+	
+	// Create invalid key files
+	os.WriteFile(invalidPrivateKeyPath, []byte("invalid private key content"), 0644)
+	os.WriteFile(invalidPublicKeyPath, []byte("invalid public key content"), 0644)
 
 	tests := []struct {
 		name           string
@@ -83,6 +90,24 @@ func TestNewManager_RS256(t *testing.T) {
 			name:           "non-existent private key",
 			privateKeyPath: "/non/existent/private.pem",
 			publicKeyPath:  publicKeyPath,
+			wantErr:        true,
+		},
+		{
+			name:           "non-existent public key",
+			privateKeyPath: privateKeyPath,
+			publicKeyPath:  "/non/existent/public.pem",
+			wantErr:        true,
+		},
+		{
+			name:           "invalid private key format",
+			privateKeyPath: invalidPrivateKeyPath,
+			publicKeyPath:  publicKeyPath,
+			wantErr:        true,
+		},
+		{
+			name:           "invalid public key format",
+			privateKeyPath: privateKeyPath,
+			publicKeyPath:  invalidPublicKeyPath,
 			wantErr:        true,
 		},
 	}
@@ -271,6 +296,71 @@ func TestManager_ValidateAccessToken_WrongSigningMethod(t *testing.T) {
 	}
 }
 
+func TestManager_ValidateAccessToken_InvalidToken(t *testing.T) {
+	manager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
+
+	// Test with invalid claims type
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "test",
+		"exp":     time.Now().Add(1 * time.Hour).Unix(),
+	})
+	tokenString, _ := token.SignedString([]byte("test-secret"))
+	
+	// Manually create invalid token by modifying the valid one
+	// JWT tokens have 3 parts separated by dots
+	parts := strings.Split(tokenString, ".")
+	if len(parts) == 3 {
+		// Modify the signature to make it invalid
+		invalidTokenString := parts[0] + "." + parts[1] + ".invalidsignature"
+		_, err := manager.ValidateAccessToken(invalidTokenString)
+		if err == nil {
+			t.Error("ValidateAccessToken() should return error for invalid signature")
+		}
+	}
+}
+
+func TestManager_GenerateAccessToken_UnsupportedAlgorithm(t *testing.T) {
+	// Create a manager with an unsupported algorithm by modifying it after creation
+	manager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
+	manager.algorithm = "UNSUPPORTED"
+	
+	_, err := manager.GenerateAccessToken("user-123", "test@example.com", true)
+	if err == nil {
+		t.Error("GenerateAccessToken() should return error for unsupported algorithm")
+	}
+}
+
+func TestManager_SigningAndVerificationKeys(t *testing.T) {
+	// Test getSigningKey and getVerificationKey with unsupported algorithm
+	manager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
+	manager.algorithm = "UNSUPPORTED"
+	
+	signingKey := manager.getSigningKey()
+	if signingKey != nil {
+		t.Error("getSigningKey() should return nil for unsupported algorithm")
+	}
+	
+	verificationKey := manager.getVerificationKey()
+	if verificationKey != nil {
+		t.Error("getVerificationKey() should return nil for unsupported algorithm")
+	}
+}
+
+func TestManager_ValidateAccessToken_UnsupportedAlgorithm(t *testing.T) {
+	// Create a valid token first
+	validManager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
+	tokenString, _ := validManager.GenerateAccessToken("user-123", "test@example.com", true)
+	
+	// Create a manager with unsupported algorithm
+	invalidManager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
+	invalidManager.algorithm = "UNSUPPORTED"
+	
+	_, err := invalidManager.ValidateAccessToken(tokenString)
+	if err == nil {
+		t.Error("ValidateAccessToken() should return error for unsupported algorithm")
+	}
+}
+
 func TestManager_GetPublicKey(t *testing.T) {
 	// Test with HS256 manager
 	hs256Manager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
@@ -292,6 +382,36 @@ func TestManager_GetPublicKey(t *testing.T) {
 	}
 	if publicKey == nil {
 		t.Error("GetPublicKey() returned nil public key")
+	}
+}
+
+func TestManager_GetJWKS(t *testing.T) {
+	// Test with HS256 manager
+	hs256Manager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
+	_, err := hs256Manager.GetJWKS()
+	if err == nil {
+		t.Error("GetJWKS() should return error for HS256 algorithm")
+	}
+
+	// Test with RS256 manager
+	tempDir := t.TempDir()
+	privateKeyPath := filepath.Join(tempDir, "private.pem")
+	publicKeyPath := filepath.Join(tempDir, "public.pem")
+	generateTestKeys(t, privateKeyPath, publicKeyPath)
+
+	rs256Manager, _ := NewManager("RS256", "", privateKeyPath, publicKeyPath, "test-issuer", 15*time.Minute)
+	jwks, err := rs256Manager.GetJWKS()
+	if err != nil {
+		t.Errorf("GetJWKS() error = %v", err)
+	}
+	if jwks == nil {
+		t.Error("GetJWKS() returned nil")
+	}
+	
+	// Check JWKS structure
+	keys, ok := jwks["keys"].([]map[string]interface{})
+	if !ok || len(keys) == 0 {
+		t.Error("GetJWKS() should return keys array")
 	}
 }
 

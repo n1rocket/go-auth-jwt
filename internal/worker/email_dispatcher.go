@@ -145,8 +145,6 @@ func (d *EmailDispatcher) EnqueueWithContext(ctx context.Context, email email.Em
 			"subject", email.Subject,
 		)
 		return nil
-	default:
-		return fmt.Errorf("email queue is full")
 	}
 }
 

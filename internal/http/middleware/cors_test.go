@@ -68,7 +68,7 @@ func TestCORS(t *testing.T) {
 			requestMethod: "GET",
 			expectedStatus: http.StatusOK,
 			expectedHeaders: map[string]string{
-				"Access-Control-Allow-Origin":      "*",
+				"Access-Control-Allow-Origin":      "https://example.com",
 				"Access-Control-Allow-Credentials": "true",
 				"Vary":                             "Origin",
 			},

@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"context"
-	"expvar"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -145,7 +145,8 @@ func (m *Metrics) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			close(m.stopCh)
+			return
+		case <-m.stopCh:
 			return
 		case <-ticker.C:
 			m.updateSystemMetrics()
@@ -155,7 +156,12 @@ func (m *Metrics) Start(ctx context.Context) {
 
 // Stop stops the metrics collection
 func (m *Metrics) Stop() {
-	close(m.stopCh)
+	select {
+	case <-m.stopCh:
+		// Already closed
+	default:
+		close(m.stopCh)
+	}
 }
 
 // Handler returns an HTTP handler for metrics endpoint
@@ -174,8 +180,12 @@ func (m *Metrics) Handler() http.Handler {
 		// Add current timestamp
 		metrics["timestamp"] = time.Now().Unix()
 		
-		// Write as JSON using expvar
-		fmt.Fprintf(w, "%s\n", expvar.NewMap("metrics").String())
+		// Encode metrics as JSON
+		encoder := json.NewEncoder(w)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(metrics); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 }
 
@@ -315,6 +325,8 @@ func (m *Metrics) RecordHTTPRequest(method, path, status string, duration time.D
 		"status": status,
 	}
 	
+	// Increment both base and labeled counters
+	m.RequestsTotal.Inc()
 	m.RequestsTotal.WithLabels(labels).Inc()
 	m.RequestDuration.WithLabels(labels).Observe(duration.Seconds())
 	m.ResponseSize.WithLabels(labels).Observe(float64(size))
@@ -326,10 +338,13 @@ func (m *Metrics) RecordDBQuery(operation string, duration time.Duration, err er
 		"operation": operation,
 	}
 	
+	// Increment both base and labeled counters
+	m.DBQueriesTotal.Inc()
 	m.DBQueriesTotal.WithLabels(labels).Inc()
 	m.DBQueryDuration.WithLabels(labels).Observe(duration.Seconds())
 	
 	if err != nil {
+		m.DBErrors.Inc()
 		m.DBErrors.WithLabels(labels).Inc()
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -216,15 +217,11 @@ func min(a, b float64) float64 {
 func getClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP in the list
-		if idx := len(xff) - 1; idx > 0 {
-			for i := idx; i >= 0; i-- {
-				if xff[i] == ',' || xff[i] == ' ' {
-					return xff[i+1:]
-				}
-			}
+		// Take the first IP in the list (comma-separated)
+		if idx := strings.Index(xff, ","); idx > 0 {
+			return strings.TrimSpace(xff[:idx])
 		}
-		return xff
+		return strings.TrimSpace(xff)
 	}
 
 	// Check X-Real-IP header
@@ -232,7 +229,14 @@ func getClientIP(r *http.Request) string {
 		return xri
 	}
 
-	// Fall back to RemoteAddr
+	// Fall back to RemoteAddr - extract IP from IP:port format
+	if addr := r.RemoteAddr; addr != "" {
+		if idx := strings.LastIndex(addr, ":"); idx > 0 {
+			return addr[:idx]
+		}
+		return addr
+	}
+	
 	return r.RemoteAddr
 }
 

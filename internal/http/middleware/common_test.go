@@ -328,3 +328,119 @@ func TestSecurity_Legacy(t *testing.T) {
 		}
 	})
 }
+
+func TestResponseWriter(t *testing.T) {
+	rec := httptest.NewRecorder()
+	rw := &responseWriter{ResponseWriter: rec}
+
+	// Test WriteHeader
+	rw.WriteHeader(http.StatusCreated)
+	if rw.statusCode != http.StatusCreated {
+		t.Errorf("Expected status code %d, got %d", http.StatusCreated, rw.statusCode)
+	}
+
+	// Test WriteHeader multiple times (should only record first)
+	rw.WriteHeader(http.StatusOK)
+	if rw.statusCode != http.StatusCreated {
+		t.Errorf("Status code should remain %d, got %d", http.StatusCreated, rw.statusCode)
+	}
+
+	// Test Write without WriteHeader (should set status to 200)
+	rw2 := &responseWriter{ResponseWriter: httptest.NewRecorder()}
+	data := []byte("test data")
+	n, err := rw2.Write(data)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if n != len(data) {
+		t.Errorf("Expected to write %d bytes, wrote %d", len(data), n)
+	}
+	if rw2.statusCode != http.StatusOK {
+		t.Errorf("Expected default status code %d, got %d", http.StatusOK, rw2.statusCode)
+	}
+}
+
+func TestIsOriginAllowed(t *testing.T) {
+	tests := []struct {
+		name           string
+		origin         string
+		allowedOrigins []string
+		expected       bool
+	}{
+		{
+			name:           "wildcard allows all",
+			origin:         "https://example.com",
+			allowedOrigins: []string{"*"},
+			expected:       true,
+		},
+		{
+			name:           "exact match",
+			origin:         "https://example.com",
+			allowedOrigins: []string{"https://example.com", "https://other.com"},
+			expected:       true,
+		},
+		{
+			name:           "no match",
+			origin:         "https://notallowed.com",
+			allowedOrigins: []string{"https://example.com", "https://other.com"},
+			expected:       false,
+		},
+		{
+			name:           "empty origin",
+			origin:         "",
+			allowedOrigins: []string{"https://example.com"},
+			expected:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isOriginAllowed(tt.origin, tt.allowedOrigins)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestJoinStrings(t *testing.T) {
+	tests := []struct {
+		name     string
+		strs     []string
+		sep      string
+		expected string
+	}{
+		{
+			name:     "empty slice",
+			strs:     []string{},
+			sep:      ", ",
+			expected: "",
+		},
+		{
+			name:     "single element",
+			strs:     []string{"hello"},
+			sep:      ", ",
+			expected: "hello",
+		},
+		{
+			name:     "multiple elements",
+			strs:     []string{"a", "b", "c"},
+			sep:      ", ",
+			expected: "a, b, c",
+		},
+		{
+			name:     "different separator",
+			strs:     []string{"one", "two", "three"},
+			expected: "one, two, three",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := joinStrings(tt.strs)
+			if result != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}

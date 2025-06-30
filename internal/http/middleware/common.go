@@ -57,7 +57,7 @@ func Logger(next http.Handler) http.Handler {
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", wrapped.statusCode,
-			"duration_ms", duration.Milliseconds(),
+			"duration", duration.String(),
 			"remote_addr", r.RemoteAddr,
 			"user_agent", r.UserAgent(),
 		)
@@ -69,19 +69,34 @@ func Recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
+				// Check if it's ErrAbortHandler - this is a special case
+				if err == http.ErrAbortHandler {
+					// Don't log for ErrAbortHandler but still return 500
+					if w.Header().Get("Content-Type") == "" {
+						response.WriteJSON(w, http.StatusInternalServerError, map[string]string{
+							"error":   "internal_error",
+							"message": "An unexpected error occurred",
+						})
+					}
+					return
+				}
+				
 				// Log the panic
 				requestID, _ := r.Context().Value("request_id").(string)
 				slog.Error("panic recovered",
 					"request_id", requestID,
-					"error", err,
+					"panic", err,
 					"stack", string(debug.Stack()),
 				)
 
-				// Return 500 error
-				response.WriteJSON(w, http.StatusInternalServerError, map[string]string{
-					"error":   "internal_error",
-					"message": "An unexpected error occurred",
-				})
+				// Check if response has already been written
+				if w.Header().Get("Content-Type") == "" {
+					// Return 500 error only if headers haven't been sent
+					response.WriteJSON(w, http.StatusInternalServerError, map[string]string{
+						"error":   "internal_error",
+						"message": "An unexpected error occurred",
+					})
+				}
 			}
 		}()
 

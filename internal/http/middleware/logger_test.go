@@ -253,8 +253,15 @@ func TestLogger_Panic(t *testing.T) {
 	loggerMiddleware.ServeHTTP(w, req)
 	
 	// Should log the 500 error
+	// Parse the last log entry (from Logger middleware)
+	logs := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(logs) == 0 {
+		t.Fatal("No log output")
+	}
+	
 	var logEntry map[string]interface{}
-	if err := json.Unmarshal(buf.Bytes(), &logEntry); err != nil {
+	lastLog := logs[len(logs)-1]
+	if err := json.Unmarshal([]byte(lastLog), &logEntry); err != nil {
 		t.Fatalf("Failed to parse log output: %v", err)
 	}
 	

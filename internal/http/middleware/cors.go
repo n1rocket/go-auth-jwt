@@ -27,6 +27,7 @@ func DefaultCORSConfig() CORSConfig {
 			http.MethodPatch,
 			http.MethodDelete,
 			http.MethodOptions,
+			http.MethodHead,
 		},
 		AllowedHeaders: []string{
 			"Accept",
@@ -76,9 +77,8 @@ func StrictCORSConfig(allowedOrigins []string) CORSConfig {
 // NewCORS creates a new CORS middleware with the given configuration
 func NewCORS(config CORSConfig) func(http.Handler) http.Handler {
 	// Pre-compute header values
-	allowedMethods := strings.Join(config.AllowedMethods, ", ")
-	allowedHeaders := strings.Join(config.AllowedHeaders, ", ")
-	exposedHeaders := strings.Join(config.ExposedHeaders, ", ")
+	allowedMethods := strings.Join(config.AllowedMethods, ",")
+	exposedHeaders := strings.Join(config.ExposedHeaders, ",")
 	maxAge := strconv.Itoa(config.MaxAge)
 
 	return func(next http.Handler) http.Handler {
@@ -93,7 +93,13 @@ func NewCORS(config CORSConfig) func(http.Handler) http.Handler {
 
 			// Check if origin is allowed
 			if isAllowedOrigin(origin, config.AllowedOrigins) {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
+				// If wildcard is used, return "*" unless credentials are required
+				if len(config.AllowedOrigins) == 1 && config.AllowedOrigins[0] == "*" && !config.AllowCredentials {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				} else {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Vary", "Origin")
+				}
 				
 				if config.AllowCredentials {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -107,20 +113,26 @@ func NewCORS(config CORSConfig) func(http.Handler) http.Handler {
 			// Handle preflight requests
 			if r.Method == http.MethodOptions {
 				// Check if this is a preflight request
-				if r.Header.Get("Access-Control-Request-Method") != "" {
-					w.Header().Set("Access-Control-Allow-Methods", allowedMethods)
+				requestedMethod := r.Header.Get("Access-Control-Request-Method")
+				if requestedMethod != "" {
+					// Check if the requested method is allowed
+					if !isMethodAllowed(requestedMethod, config.AllowedMethods) {
+						w.WriteHeader(http.StatusForbidden)
+						return
+					}
 					
 					// Handle requested headers
 					requestedHeaders := r.Header.Get("Access-Control-Request-Headers")
 					if requestedHeaders != "" {
 						// Check if all requested headers are allowed
-						if areHeadersAllowed(requestedHeaders, config.AllowedHeaders) {
-							w.Header().Set("Access-Control-Allow-Headers", requestedHeaders)
-						} else {
-							w.Header().Set("Access-Control-Allow-Headers", allowedHeaders)
+						if !areHeadersAllowed(requestedHeaders, config.AllowedHeaders) {
+							w.WriteHeader(http.StatusForbidden)
+							return
 						}
+						w.Header().Set("Access-Control-Allow-Headers", requestedHeaders)
 					}
 					
+					w.Header().Set("Access-Control-Allow-Methods", allowedMethods)
 					w.Header().Set("Access-Control-Max-Age", maxAge)
 					w.WriteHeader(http.StatusNoContent)
 					return
@@ -142,11 +154,43 @@ func isAllowedOrigin(origin string, allowedOrigins []string) bool {
 			return true
 		}
 		// Support wildcard subdomains
-		if strings.HasPrefix(allowed, "*.") {
-			domain := allowed[2:]
-			if strings.HasSuffix(origin, domain) {
-				return true
+		if strings.Contains(allowed, "*.") {
+			// Extract the parts: scheme and domain
+			wildcardParts := strings.SplitN(allowed, "://", 2)
+			if len(wildcardParts) == 2 {
+				scheme := wildcardParts[0]
+				wildcardDomain := wildcardParts[1]
+				
+				// Extract origin parts
+				originParts := strings.SplitN(origin, "://", 2)
+				if len(originParts) == 2 && originParts[0] == scheme {
+					originDomain := originParts[1]
+					
+					// Remove the "*" and check if origin matches the pattern
+					if strings.HasPrefix(wildcardDomain, "*.") {
+						baseDomain := wildcardDomain[1:] // Keeps the dot
+						
+						// Check if origin ends with the base domain and has a subdomain
+						if strings.HasSuffix(originDomain, baseDomain) {
+							// Make sure there's a subdomain (not just the base domain)
+							subdomainPart := strings.TrimSuffix(originDomain, baseDomain)
+							if len(subdomainPart) > 0 && !strings.Contains(subdomainPart, ".") {
+								return true
+							}
+						}
+					}
+				}
 			}
+		}
+	}
+	return false
+}
+
+// isMethodAllowed checks if a method is in the allowed list
+func isMethodAllowed(method string, allowed []string) bool {
+	for _, m := range allowed {
+		if m == method {
+			return true
 		}
 	}
 	return false

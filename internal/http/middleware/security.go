@@ -41,7 +41,7 @@ func DefaultSecurityConfig() SecurityConfig {
 		CrossOriginResourcePolicy:  "same-origin",
 		
 		StrictTransportSecurity: "max-age=31536000; includeSubDomains",
-		ForceHTTPS:              false, // Set to true in production
+		ForceHTTPS:              true,
 		
 		XContentTypeOptions: "nosniff",
 		XFrameOptions:       "DENY",
@@ -56,13 +56,13 @@ func DefaultSecurityConfig() SecurityConfig {
 // StrictSecurityConfig returns strict security configuration for production
 func StrictSecurityConfig() SecurityConfig {
 	return SecurityConfig{
-		ContentSecurityPolicy: "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;",
+		ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;",
 		
 		CrossOriginEmbedderPolicy:  "require-corp",
 		CrossOriginOpenerPolicy:    "same-origin",
 		CrossOriginResourcePolicy:  "same-origin",
 		
-		StrictTransportSecurity: "max-age=63072000; includeSubDomains; preload",
+		StrictTransportSecurity: "max-age=31536000; includeSubDomains",
 		ForceHTTPS:              true,
 		
 		XContentTypeOptions: "nosniff",
@@ -86,8 +86,8 @@ func APISecurityConfig() SecurityConfig {
 		CrossOriginOpenerPolicy:    "same-origin",
 		CrossOriginResourcePolicy:  "cross-origin", // Allow API access from different origins
 		
-		StrictTransportSecurity: "max-age=31536000; includeSubDomains",
-		ForceHTTPS:              true,
+		StrictTransportSecurity: "",
+		ForceHTTPS:              false,
 		
 		XContentTypeOptions: "nosniff",
 		XFrameOptions:       "DENY",

@@ -139,8 +139,25 @@ func (h *Histogram) Count() uint64 {
 
 // Value returns the histogram data
 func (h *Histogram) Value() interface{} {
+	// Convert buckets to a format that can be JSON serialized
+	buckets := h.Buckets()
+	bucketList := make([]map[string]interface{}, 0, len(buckets))
+	for bound, count := range buckets {
+		// Convert +Inf to a string that can be JSON serialized
+		var le interface{}
+		if math.IsInf(bound, 1) {
+			le = "+Inf"
+		} else {
+			le = bound
+		}
+		bucketList = append(bucketList, map[string]interface{}{
+			"le":    le,
+			"count": count,
+		})
+	}
+	
 	return map[string]interface{}{
-		"buckets": h.Buckets(),
+		"buckets": bucketList,
 		"sum":     h.Sum(),
 		"count":   h.Count(),
 	}

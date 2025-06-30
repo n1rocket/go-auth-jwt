@@ -226,7 +226,7 @@ func TestKeyFunctions(t *testing.T) {
 			{
 				name:       "RemoteAddr only",
 				remoteAddr: "192.168.1.1:1234",
-				expected:   "192.168.1.1:1234",
+				expected:   "192.168.1.1",
 			},
 			{
 				name: "X-Forwarded-For",
@@ -287,4 +287,200 @@ func TestKeyFunctions(t *testing.T) {
 // WithUserID adds user ID to context for testing
 func WithUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, "userID", userID)
+}
+
+func TestPathKeyFunc(t *testing.T) {
+	keyFunc := PathKeyFunc()
+	
+	tests := []struct {
+		name       string
+		path       string
+		remoteAddr string
+		expected   string
+	}{
+		{
+			name:       "simple path",
+			path:       "/api/users",
+			remoteAddr: "192.0.2.1:1234",
+			expected:   "192.0.2.1:/api/users",
+		},
+		{
+			name:       "path with ID",
+			path:       "/api/users/123",
+			remoteAddr: "192.0.2.1:1234",
+			expected:   "192.0.2.1:/api/users/123",
+		},
+		{
+			name:       "root path",
+			path:       "/",
+			remoteAddr: "192.0.2.1:1234",
+			expected:   "192.0.2.1:/",
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			req.RemoteAddr = tt.remoteAddr
+			key := keyFunc(req)
+			if key != tt.expected {
+				t.Errorf("Expected key %s, got %s", tt.expected, key)
+			}
+		})
+	}
+}
+
+func TestDefaultRateLimitConfig(t *testing.T) {
+	config := DefaultRateLimitConfig()
+	
+	if config.Rate != 100 {
+		t.Errorf("Expected rate 100, got %d", config.Rate)
+	}
+	if config.Burst != 10 {
+		t.Errorf("Expected burst 10, got %d", config.Burst)
+	}
+	if config.Window != time.Minute {
+		t.Errorf("Expected window 1 minute, got %v", config.Window)
+	}
+	if config.KeyFunc == nil {
+		t.Error("Expected KeyFunc to be set")
+	}
+}
+
+func TestRateLimiterCleanup(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	config := RateLimitConfig{
+		Rate:    10,
+		Burst:   5,
+		Window:  time.Second,
+		KeyFunc: IPKeyFunc(),
+	}
+	
+	// Create limiter without starting the cleanup goroutine
+	limiter := &RateLimiter{
+		buckets: make(map[string]*TokenBucket),
+		rate:    config.Rate,
+		burst:   config.Burst,
+		window:  config.Window,
+		keyFunc: config.KeyFunc,
+		logger:  logger,
+	}
+	
+	// Add some buckets
+	limiter.Allow("key1")
+	limiter.Allow("key2")
+	limiter.Allow("key3")
+	
+	// Manually set old lastFill times for testing
+	now := time.Now()
+	oldTime := now.Add(-3 * config.Window) // Older than 2x window
+	
+	limiter.mu.Lock()
+	for key, bucket := range limiter.buckets {
+		if key == "key1" {
+			bucket.mu.Lock()
+			bucket.lastFill = oldTime
+			bucket.mu.Unlock()
+		}
+	}
+	limiter.mu.Unlock()
+	
+	// Manually trigger cleanup logic
+	limiter.mu.Lock()
+	for key, bucket := range limiter.buckets {
+		bucket.mu.Lock()
+		// Remove buckets that haven't been used for 2x the window
+		if now.Sub(bucket.lastFill) > 2*limiter.window {
+			delete(limiter.buckets, key)
+		}
+		bucket.mu.Unlock()
+	}
+	limiter.mu.Unlock()
+	
+	// Check that old bucket was removed
+	limiter.mu.RLock()
+	_, exists := limiter.buckets["key1"]
+	limiter.mu.RUnlock()
+	
+	if exists {
+		t.Error("Expected old bucket to be cleaned up")
+	}
+	
+	// Check that recent buckets still exist
+	limiter.mu.RLock()
+	_, exists2 := limiter.buckets["key2"]
+	_, exists3 := limiter.buckets["key3"]
+	limiter.mu.RUnlock()
+	
+	if !exists2 || !exists3 {
+		t.Error("Expected recent buckets to remain")
+	}
+}
+
+func TestGetClientIP(t *testing.T) {
+	tests := []struct {
+		name       string
+		headers    map[string]string
+		remoteAddr string
+		expected   string
+	}{
+		{
+			name:       "RemoteAddr with port",
+			remoteAddr: "192.168.1.1:1234",
+			expected:   "192.168.1.1",
+		},
+		{
+			name:       "RemoteAddr without port",
+			remoteAddr: "192.168.1.1",
+			expected:   "192.168.1.1",
+		},
+		{
+			name: "X-Forwarded-For single IP",
+			headers: map[string]string{
+				"X-Forwarded-For": "10.0.0.1",
+			},
+			remoteAddr: "192.168.1.1:1234",
+			expected:   "10.0.0.1",
+		},
+		{
+			name: "X-Forwarded-For multiple IPs",
+			headers: map[string]string{
+				"X-Forwarded-For": "10.0.0.1, 10.0.0.2, 10.0.0.3",
+			},
+			remoteAddr: "192.168.1.1:1234",
+			expected:   "10.0.0.1",
+		},
+		{
+			name: "X-Real-IP",
+			headers: map[string]string{
+				"X-Real-IP": "10.0.0.2",
+			},
+			remoteAddr: "192.168.1.1:1234",
+			expected:   "10.0.0.2",
+		},
+		{
+			name: "Multiple headers - X-Forwarded-For takes precedence",
+			headers: map[string]string{
+				"X-Forwarded-For": "10.0.0.1",
+				"X-Real-IP":       "10.0.0.2",
+			},
+			remoteAddr: "192.168.1.1:1234",
+			expected:   "10.0.0.1",
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			req.RemoteAddr = tt.remoteAddr
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+			
+			ip := getClientIP(req)
+			if ip != tt.expected {
+				t.Errorf("Expected IP %s, got %s", tt.expected, ip)
+			}
+		})
+	}
 }

@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -274,7 +275,7 @@ func (e *Exporter) sendHTTPBatch(client *http.Client, batch []MetricSnapshot) {
 	}
 
 	resp, err := client.Post(e.config.HTTPPush, "application/json", 
-		json.NewReader(data))
+		bytes.NewReader(data))
 	if err != nil {
 		e.logger.Error("Failed to push metrics",
 			slog.String("url", e.config.HTTPPush),

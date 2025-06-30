@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -212,16 +213,22 @@ func (m *Monitor) performReadinessChecks() []ReadinessCheck {
 
 // checksToJSON converts checks to JSON string
 func checksToJSON(checks []ReadinessCheck) string {
-	result := "["
-	for i, check := range checks {
-		if i > 0 {
-			result += ","
+	// Convert to JSON using json.Marshal
+	data, err := json.Marshal(checks)
+	if err != nil {
+		// Fallback to manual JSON construction
+		result := "["
+		for i, check := range checks {
+			if i > 0 {
+				result += ","
+			}
+			result += fmt.Sprintf(`{"name":"%s","healthy":%t,"message":"%s","latency_ms":%d}`,
+				check.Name, check.Healthy, check.Message, check.Latency.Milliseconds())
 		}
-		result += fmt.Sprintf(`{"name":"%s","healthy":%t,"message":"%s","latency_ms":%d}`,
-			check.Name, check.Healthy, check.Message, check.Latency.Milliseconds())
+		result += "]"
+		return result
 	}
-	result += "]"
-	return result
+	return string(data)
 }
 
 // setupProfiling sets up profiling endpoints

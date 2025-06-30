@@ -1,268 +1,307 @@
-// +build integration
-
 package main
 
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	_ "github.com/lib/pq"
 
 	"github.com/abueno/go-auth-jwt/internal/config"
 	"github.com/abueno/go-auth-jwt/internal/db"
 	"github.com/abueno/go-auth-jwt/internal/email"
 	"github.com/abueno/go-auth-jwt/internal/http/handlers"
 	"github.com/abueno/go-auth-jwt/internal/http/middleware"
-	"github.com/abueno/go-auth-jwt/internal/repository/postgres"
-	"github.com/abueno/go-auth-jwt/internal/security"
-	"github.com/abueno/go-auth-jwt/internal/service"
 	"github.com/abueno/go-auth-jwt/internal/token"
+	"github.com/abueno/go-auth-jwt/internal/metrics"
+	"github.com/abueno/go-auth-jwt/internal/repository/postgres"
+	"github.com/abueno/go-auth-jwt/internal/service"
 	"github.com/abueno/go-auth-jwt/internal/worker"
-	"github.com/gorilla/mux"
-	"log/slog"
 )
 
-var (
-	testServer *httptest.Server
-	testDB     *db.DB
-	testEmail  *email.MockService
-)
-
-func TestMain(m *testing.M) {
-	// Setup
-	setupTestEnvironment()
-	
-	// Run tests
-	code := m.Run()
-	
-	// Cleanup
-	teardownTestEnvironment()
-	
-	os.Exit(code)
+// TestServer encapsulates all the components needed for integration testing
+type TestServer struct {
+	db             *sql.DB
+	server         *httptest.Server
+	userService    service.UserService
+	authService    service.AuthService
+	emailService   email.Service
+	tokenService   token.Service
+	metricsService *metrics.Metrics
+	config         *config.Config
 }
 
-func setupTestEnvironment() {
-	// Create logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelWarn,
-	}))
-
-	// Load test configuration
+// SetupTestServer creates a new test server with all dependencies
+func SetupTestServer(t *testing.T) *TestServer {
+	// Create test configuration
 	cfg := &config.Config{
-		Server: config.ServerConfig{
-			Port:         "0",
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 15 * time.Second,
-			IdleTimeout:  60 * time.Second,
-		},
 		Database: config.DatabaseConfig{
-			DSN:             getEnvOrDefault("TEST_DATABASE_DSN", "postgres://postgres:password@localhost:5432/authdb_test?sslmode=disable"),
-			MaxOpenConns:    5,
-			MaxIdleConns:    2,
-			ConnMaxLifetime: 5 * time.Minute,
-			ConnMaxIdleTime: 1 * time.Minute,
+			Host:     "localhost",
+			Port:     5432,
+			User:     "test",
+			Password: "test",
+			DBName:   "test_auth",
+			SSLMode:  "disable",
 		},
 		JWT: config.JWTConfig{
-			Secret:    "test-secret-key-for-integration-testing",
-			Algorithm: "HS256",
-			Issuer:    "auth-test",
-			Duration:  15 * time.Minute,
+			Secret:                   "test-secret",
+			AccessTokenExpiration:    15 * time.Minute,
+			RefreshTokenExpiration:   7 * 24 * time.Hour,
+			EmailVerificationExpiry:  24 * time.Hour,
+			PasswordResetTokenExpiry: 1 * time.Hour,
 		},
 		Email: config.EmailConfig{
+			From: "test@example.com",
 			SMTP: config.SMTPConfig{
-				Host:        "localhost",
-				Port:        1025,
-				Username:    "test",
-				Password:    "test",
-				FromAddress: "test@example.com",
-				FromName:    "Test App",
+				Host:     "localhost",
+				Port:     1025,
+				Username: "test",
+				Password: "test",
+			},
+			Templates: config.EmailTemplates{
+				VerificationEmail: "templates/verification.html",
+				WelcomeEmail:      "templates/welcome.html",
+				PasswordReset:     "templates/password_reset.html",
 			},
 		},
-		Security: config.SecurityConfig{
-			CORS: middleware.DefaultCORSConfig(),
+		Server: config.ServerConfig{
+			Port:            "8080",
+			ReadTimeout:     15 * time.Second,
+			WriteTimeout:    15 * time.Second,
+			IdleTimeout:     60 * time.Second,
+			ShutdownTimeout: 30 * time.Second,
 		},
 		Worker: config.WorkerConfig{
-			PoolSize:  2,
-			QueueSize: 10,
+			MaxWorkers:     10,
+			MaxQueueSize:   1000,
+			MaxRetries:     3,
+			RetryDelay:     time.Second,
+			ProcessTimeout: 5 * time.Minute,
 		},
-		App: config.AppConfig{
-			BaseURL:     "http://localhost:8080",
-			FrontendURL: "http://localhost:3000",
+		RateLimit: config.RateLimitConfig{
+			RequestsPerMinute: 60,
+			BurstSize:         10,
+		},
+		Security: config.SecurityConfig{
+			BCryptCost:     10,
+			AllowedOrigins: []string{"http://localhost:3000"},
+			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{"Content-Type", "Authorization"},
 		},
 	}
 
 	// Create database connection
-	var err error
-	testDB, err = db.New(&cfg.Database)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to connect to test database: %v", err))
-	}
+	testDB := setupTestDatabase(t)
 
-	// Clean database
-	cleanDatabase()
+	// Run migrations
+	if err := db.RunMigrations(testDB, "file://migrations"); err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
+	}
 
 	// Create repositories
 	userRepo := postgres.NewUserRepository(testDB)
 	refreshTokenRepo := postgres.NewRefreshTokenRepository(testDB)
 
 	// Create services
-	passwordHasher := security.NewDefaultPasswordHasher()
-	tokenManager, err := token.NewManager(
-		cfg.JWT.Algorithm,
-		cfg.JWT.Secret,
-		"", "", // No RS256 keys for test
-		cfg.JWT.Issuer,
-		cfg.JWT.Duration,
-	)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create token manager: %v", err))
+	jwtService := token.NewService(cfg.JWT.Secret)
+	
+	// Create mock email service
+	emailService := &mockEmailService{
+		sentEmails: make(map[string][]mockEmail),
+		mu:         sync.Mutex{},
 	}
 
+	// Create metrics service
+	metricsService := metrics.NewMetrics()
+
+	// Create auth service
 	authService := service.NewAuthService(
 		userRepo,
 		refreshTokenRepo,
-		passwordHasher,
-		tokenManager,
-		7*24*time.Hour, // 7 days refresh token TTL
+		jwtService,
+		emailService,
+		cfg.JWT.AccessTokenExpiration,
+		cfg.JWT.RefreshTokenExpiration,
+		cfg.Security.BCryptCost,
 	)
 
-	// Create mock email service
-	testEmail = email.NewMockService(logger)
-	
-	// Create email dispatcher
-	emailDispatcher := worker.NewEmailDispatcher(testEmail, cfg.Worker.PoolSize, cfg.Worker.QueueSize, logger)
-	emailDispatcher.Start()
+	// Create user service
+	userService := service.NewUserService(userRepo, cfg.Security.BCryptCost)
 
-	// Create auth service with email
-	authServiceWithEmail := service.NewAuthServiceWithEmail(authService, emailDispatcher, cfg, logger)
+	// Create worker pool
+	workerPool := worker.NewPool(cfg.Worker.MaxWorkers, cfg.Worker.MaxQueueSize)
 
 	// Create handlers
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, jwtService, cfg)
+	userHandler := handlers.NewUserHandler(userService, jwtService)
+	healthHandler := handlers.NewHealthHandler(testDB)
 
 	// Create router
-	router := mux.NewRouter()
+	router := http.NewServeMux()
+
+	// Setup middleware
+	rateLimiter := middleware.NewRateLimiter(cfg.RateLimit.RequestsPerMinute, cfg.RateLimit.BurstSize)
 	
-	// Add middleware
-	router.Use(middleware.RequestID)
-	router.Use(middleware.Logger(logger))
-	router.Use(middleware.Recover(router.NotFoundHandler))
-	router.Use(middleware.Security(cfg.Security))
-	router.Use(middleware.CORS(cfg.Security.CORS))
-
-	// API routes
-	apiRouter := router.PathPrefix("/api/v1").Subrouter()
-
-	// Auth routes
-	authRouter := apiRouter.PathPrefix("/auth").Subrouter()
-	authRouter.HandleFunc("/signup", authHandler.Signup).Methods("POST")
-	authRouter.HandleFunc("/login", authHandler.Login).Methods("POST")
-	authRouter.HandleFunc("/refresh", authHandler.Refresh).Methods("POST")
-	authRouter.HandleFunc("/verify-email", authHandler.VerifyEmail).Methods("POST")
-
-	// Protected routes (need auth middleware)
-	protected := authRouter.NewRoute().Subrouter()
-	protected.Use(createAuthMiddleware(tokenManager))
-	protected.HandleFunc("/logout", authHandler.Logout).Methods("POST")
-	protected.HandleFunc("/logout-all", authHandler.LogoutAll).Methods("POST")
-	protected.HandleFunc("/me", authHandler.GetCurrentUser).Methods("GET")
-
-	// Health check routes
-	router.HandleFunc("/health", handlers.Health).Methods("GET")
-	router.HandleFunc("/ready", handlers.Ready).Methods("GET")
+	// Public routes
+	router.HandleFunc("/health", healthHandler.Health)
+	router.HandleFunc("/ready", healthHandler.Ready)
+	router.HandleFunc("/auth/signup", withMiddleware(authHandler.Signup, rateLimiter.Limit))
+	router.HandleFunc("/auth/login", withMiddleware(authHandler.Login, rateLimiter.Limit))
+	router.HandleFunc("/auth/refresh", authHandler.RefreshToken)
+	router.HandleFunc("/auth/verify-email", authHandler.VerifyEmail)
+	router.HandleFunc("/auth/resend-verification", withMiddleware(authHandler.ResendVerificationEmail, rateLimiter.Limit))
+	router.HandleFunc("/auth/forgot-password", withMiddleware(authHandler.ForgotPassword, rateLimiter.Limit))
+	router.HandleFunc("/auth/reset-password", authHandler.ResetPassword)
+	
+	// Protected routes
+	router.HandleFunc("/auth/logout", withAuth(authHandler.Logout, jwtService))
+	router.HandleFunc("/users/profile", withAuth(userHandler.GetProfile, jwtService))
+	router.HandleFunc("/users/update-password", withAuth(userHandler.UpdatePassword, jwtService))
 
 	// Create test server
-	testServer = httptest.NewServer(router)
-}
+	server := httptest.NewServer(router)
 
-func teardownTestEnvironment() {
-	if testServer != nil {
-		testServer.Close()
-	}
-	if testDB != nil {
-		cleanDatabase()
-		testDB.Close()
-	}
-}
+	// Start worker pool
+	go workerPool.Start(context.Background())
 
-func cleanDatabase() {
-	ctx := context.Background()
-	queries := []string{
-		"DELETE FROM refresh_tokens",
-		"DELETE FROM users",
-	}
-	
-	for _, query := range queries {
-		if _, err := testDB.ExecContext(ctx, query); err != nil {
-			fmt.Printf("Failed to clean database: %v\n", err)
-		}
+	return &TestServer{
+		db:             testDB,
+		server:         server,
+		userService:    userService,
+		authService:    authService,
+		emailService:   emailService,
+		tokenService:   jwtService,
+		metricsService: metricsService,
+		config:         cfg,
 	}
 }
 
-func createAuthMiddleware(tm *token.Manager) mux.MiddlewareFunc {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				http.Error(w, "Missing authorization header", http.StatusUnauthorized)
-				return
-			}
-
-			// Extract token
-			const bearerPrefix = "Bearer "
-			if !hasPrefix(authHeader, bearerPrefix) {
-				http.Error(w, "Invalid authorization header", http.StatusUnauthorized)
-				return
-			}
-
-			tokenString := authHeader[len(bearerPrefix):]
-			
-			// Validate token
-			claims, err := tm.ValidateAccessToken(tokenString)
-			if err != nil {
-				http.Error(w, "Invalid token", http.StatusUnauthorized)
-				return
-			}
-
-			// Add user ID to context
-			ctx := handlers.WithUserID(r.Context(), claims.Subject)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+// Helper function to wrap handlers with middleware
+func withMiddleware(handler http.HandlerFunc, middlewares ...func(http.HandlerFunc) http.HandlerFunc) http.HandlerFunc {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i](handler)
 	}
+	return handler
 }
 
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+// Helper function to wrap handlers with auth middleware
+func withAuth(handler http.HandlerFunc, jwtService token.Service) http.HandlerFunc {
+	authMiddleware := middleware.NewAuthMiddleware(jwtService)
+	return authMiddleware.Authenticate(handler)
 }
 
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// Helper functions for tests
-
-func makeRequest(method, path string, body interface{}, headers map[string]string) (*http.Response, error) {
-	var reqBody []byte
-	var err error
-	
-	if body != nil {
-		reqBody, err = json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	req, err := http.NewRequest(method, testServer.URL+path, bytes.NewBuffer(reqBody))
+// setupTestDatabase creates a test database connection
+func setupTestDatabase(t *testing.T) *sql.DB {
+	// For integration tests, you might want to use a real test database
+	// or a dockerized PostgreSQL instance
+	db, err := sql.Open("postgres", "postgres://test:test@localhost:5432/test_auth?sslmode=disable")
 	if err != nil {
-		return nil, err
+		t.Fatalf("Failed to connect to test database: %v", err)
 	}
+
+	// Clean up database before tests
+	cleanupQueries := []string{
+		"DROP TABLE IF EXISTS refresh_tokens CASCADE",
+		"DROP TABLE IF EXISTS users CASCADE",
+		"DROP TABLE IF EXISTS schema_migrations CASCADE",
+	}
+
+	for _, query := range cleanupQueries {
+		if _, err := db.Exec(query); err != nil {
+			t.Logf("Warning: Failed to clean up database: %v", err)
+		}
+	}
+
+	return db
+}
+
+// Cleanup closes all resources
+func (ts *TestServer) Cleanup() {
+	ts.server.Close()
+	ts.db.Close()
+}
+
+// Mock email service for testing
+type mockEmailService struct {
+	sentEmails map[string][]mockEmail
+	mu         sync.Mutex
+}
+
+type mockEmail struct {
+	to      string
+	subject string
+	body    string
+	sentAt  time.Time
+}
+
+func (m *mockEmailService) SendVerificationEmail(ctx context.Context, to, token string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	m.sentEmails[to] = append(m.sentEmails[to], mockEmail{
+		to:      to,
+		subject: "Verify your email",
+		body:    fmt.Sprintf("Verification token: %s", token),
+		sentAt:  time.Now(),
+	})
+	return nil
+}
+
+func (m *mockEmailService) SendWelcomeEmail(ctx context.Context, to, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	m.sentEmails[to] = append(m.sentEmails[to], mockEmail{
+		to:      to,
+		subject: "Welcome",
+		body:    fmt.Sprintf("Welcome %s!", name),
+		sentAt:  time.Now(),
+	})
+	return nil
+}
+
+func (m *mockEmailService) SendPasswordResetEmail(ctx context.Context, to, token string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	m.sentEmails[to] = append(m.sentEmails[to], mockEmail{
+		to:      to,
+		subject: "Reset your password",
+		body:    fmt.Sprintf("Reset token: %s", token),
+		sentAt:  time.Now(),
+	})
+	return nil
+}
+
+func (m *mockEmailService) GetSentEmails(to string) []mockEmail {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	return m.sentEmails[to]
+}
+
+// Test helpers
+
+func makeRequest(t *testing.T, server *httptest.Server, method, path string, body interface{}, headers map[string]string) *http.Response {
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		require.NoError(t, err)
+		reqBody = bytes.NewReader(jsonBody)
+	}
+
+	req, err := http.NewRequest(method, server.URL+path, reqBody)
+	require.NoError(t, err)
 
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -276,259 +315,385 @@ func makeRequest(method, path string, body interface{}, headers map[string]strin
 		Timeout: 10 * time.Second,
 	}
 
-	return client.Do(req)
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	return resp
 }
 
-func parseResponse(resp *http.Response, v interface{}) error {
+func parseResponse(t *testing.T, resp *http.Response, v interface{}) {
 	defer resp.Body.Close()
-	return json.NewDecoder(resp.Body).Decode(v)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	if v != nil {
+		err = json.Unmarshal(body, v)
+		require.NoError(t, err)
+	}
 }
 
-// Actual integration tests
+// Integration Tests
 
-func TestCompleteAuthFlow(t *testing.T) {
-	// 1. Signup
+func TestIntegration_CompleteAuthFlow(t *testing.T) {
+	ts := SetupTestServer(t)
+	defer ts.Cleanup()
+
+	// 1. Sign up a new user
 	signupReq := map[string]string{
-		"email":    "integration@example.com",
-		"password": "TestPassword123",
+		"email":    "testuser@example.com",
+		"password": "SecurePassword123!",
+		"name":     "Test User",
 	}
 
-	resp, err := makeRequest("POST", "/api/v1/auth/signup", signupReq, nil)
-	if err != nil {
-		t.Fatalf("Signup request failed: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Expected status 201, got %d", resp.StatusCode)
-	}
+	resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	var signupResp map[string]interface{}
-	if err := parseResponse(resp, &signupResp); err != nil {
-		t.Fatalf("Failed to parse signup response: %v", err)
+	parseResponse(t, resp, &signupResp)
+	assert.Contains(t, signupResp, "message")
+
+	// 2. Verify that verification email was sent
+	emailSvc := ts.emailService.(*mockEmailService)
+	emails := emailSvc.GetSentEmails("testuser@example.com")
+	require.Len(t, emails, 1)
+	assert.Contains(t, emails[0].body, "Verification token:")
+
+	// Extract verification token (in real scenario, this would be from email link)
+	// For testing, we'll generate one directly
+	verificationToken, err := ts.authService.GenerateVerificationToken(context.Background(), "testuser@example.com")
+	require.NoError(t, err)
+
+	// 3. Verify email
+	verifyReq := map[string]string{
+		"token": verificationToken,
 	}
 
-	// Check that email was sent
-	emails := testEmail.GetSentEmails()
-	if len(emails) != 1 {
-		t.Fatalf("Expected 1 email, got %d", len(emails))
-	}
+	resp = makeRequest(t, ts.server, "POST", "/auth/verify-email", verifyReq, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	verificationEmail := emails[0]
-	if verificationEmail.To != "integration@example.com" {
-		t.Errorf("Expected email to integration@example.com, got %s", verificationEmail.To)
-	}
-
-	// Extract verification token from email (in real scenario, parse from email body)
-	// For testing, we'll get it from the mock
-	lastEmail, _ := testEmail.GetLastEmail()
-	
-	// 2. Verify email
-	// In a real test, we'd parse the token from the email body
-	// For now, we'll skip this step
-
-	// 3. Login
+	// 4. Login with verified account
 	loginReq := map[string]string{
-		"email":    "integration@example.com",
-		"password": "TestPassword123",
+		"email":    "testuser@example.com",
+		"password": "SecurePassword123!",
 	}
 
-	resp, err = makeRequest("POST", "/api/v1/auth/login", loginReq, nil)
-	if err != nil {
-		t.Fatalf("Login request failed: %v", err)
-	}
+	resp = makeRequest(t, ts.server, "POST", "/auth/login", loginReq, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
+	var loginResp map[string]interface{}
+	parseResponse(t, resp, &loginResp)
+	assert.Contains(t, loginResp, "access_token")
+	assert.Contains(t, loginResp, "refresh_token")
 
-	var loginResp struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		ExpiresIn    int    `json:"expires_in"`
-	}
-	if err := parseResponse(resp, &loginResp); err != nil {
-		t.Fatalf("Failed to parse login response: %v", err)
-	}
+	accessToken := loginResp["access_token"].(string)
+	refreshToken := loginResp["refresh_token"].(string)
 
-	if loginResp.AccessToken == "" {
-		t.Error("Expected access token")
-	}
-	if loginResp.RefreshToken == "" {
-		t.Error("Expected refresh token")
-	}
-
-	// 4. Get current user
+	// 5. Access protected endpoint
 	headers := map[string]string{
-		"Authorization": "Bearer " + loginResp.AccessToken,
+		"Authorization": "Bearer " + accessToken,
 	}
 
-	resp, err = makeRequest("GET", "/api/v1/auth/me", nil, headers)
-	if err != nil {
-		t.Fatalf("Get user request failed: %v", err)
-	}
+	resp = makeRequest(t, ts.server, "GET", "/users/profile", nil, headers)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
+	var profileResp map[string]interface{}
+	parseResponse(t, resp, &profileResp)
+	assert.Equal(t, "testuser@example.com", profileResp["email"])
+	assert.Equal(t, "Test User", profileResp["name"])
 
-	var userResp struct {
-		ID            string `json:"id"`
-		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"`
-		CreatedAt     string `json:"created_at"`
-	}
-	if err := parseResponse(resp, &userResp); err != nil {
-		t.Fatalf("Failed to parse user response: %v", err)
-	}
-
-	if userResp.Email != "integration@example.com" {
-		t.Errorf("Expected email integration@example.com, got %s", userResp.Email)
-	}
-
-	// 5. Refresh token
+	// 6. Refresh token
 	refreshReq := map[string]string{
-		"refresh_token": loginResp.RefreshToken,
+		"refresh_token": refreshToken,
 	}
 
-	resp, err = makeRequest("POST", "/api/v1/auth/refresh", refreshReq, nil)
-	if err != nil {
-		t.Fatalf("Refresh request failed: %v", err)
+	resp = makeRequest(t, ts.server, "POST", "/auth/refresh", refreshReq, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var refreshResp map[string]interface{}
+	parseResponse(t, resp, &refreshResp)
+	assert.Contains(t, refreshResp, "access_token")
+	newAccessToken := refreshResp["access_token"].(string)
+
+	// 7. Use new access token
+	headers["Authorization"] = "Bearer " + newAccessToken
+
+	resp = makeRequest(t, ts.server, "GET", "/users/profile", nil, headers)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// 8. Logout
+	resp = makeRequest(t, ts.server, "POST", "/auth/logout", nil, headers)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// 9. Verify old tokens are invalid
+	resp = makeRequest(t, ts.server, "GET", "/users/profile", nil, headers)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+func TestIntegration_ConcurrentUserRegistrations(t *testing.T) {
+	ts := SetupTestServer(t)
+	defer ts.Cleanup()
+
+	const numUsers = 10
+	var wg sync.WaitGroup
+	errors := make(chan error, numUsers)
+
+	for i := 0; i < numUsers; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+
+			signupReq := map[string]string{
+				"email":    fmt.Sprintf("user%d@example.com", index),
+				"password": "SecurePassword123!",
+				"name":     fmt.Sprintf("User %d", index),
+			}
+
+			resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+			if resp.StatusCode != http.StatusCreated {
+				errors <- fmt.Errorf("user %d: expected status 201, got %d", index, resp.StatusCode)
+			}
+		}(i)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	wg.Wait()
+	close(errors)
+
+	// Check for errors
+	for err := range errors {
+		t.Error(err)
 	}
 
-	var refreshResp struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		ExpiresIn    int    `json:"expires_in"`
-	}
-	if err := parseResponse(resp, &refreshResp); err != nil {
-		t.Fatalf("Failed to parse refresh response: %v", err)
-	}
-
-	if refreshResp.AccessToken == "" {
-		t.Error("Expected new access token")
-	}
-	if refreshResp.RefreshToken == "" {
-		t.Error("Expected new refresh token")
-	}
-
-	// 6. Logout
-	logoutReq := map[string]string{
-		"refresh_token": refreshResp.RefreshToken,
-	}
-
-	headers["Authorization"] = "Bearer " + refreshResp.AccessToken
-	resp, err = makeRequest("POST", "/api/v1/auth/logout", logoutReq, headers)
-	if err != nil {
-		t.Fatalf("Logout request failed: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
-
-	// 7. Verify token is invalid after logout
-	resp, err = makeRequest("GET", "/api/v1/auth/me", nil, headers)
-	if err != nil {
-		t.Fatalf("Get user after logout request failed: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status 401 after logout, got %d", resp.StatusCode)
+	// Verify all users were created
+	for i := 0; i < numUsers; i++ {
+		email := fmt.Sprintf("user%d@example.com", i)
+		user, err := ts.userService.GetByEmail(context.Background(), email)
+		assert.NoError(t, err)
+		assert.Equal(t, email, user.Email)
 	}
 }
 
-func TestInvalidLogin(t *testing.T) {
+func TestIntegration_ErrorScenarios(t *testing.T) {
+	ts := SetupTestServer(t)
+	defer ts.Cleanup()
+
+	t.Run("Signup with invalid email", func(t *testing.T) {
+		signupReq := map[string]string{
+			"email":    "invalid-email",
+			"password": "SecurePassword123!",
+			"name":     "Test User",
+		}
+
+		resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("Signup with weak password", func(t *testing.T) {
+		signupReq := map[string]string{
+			"email":    "test@example.com",
+			"password": "weak",
+			"name":     "Test User",
+		}
+
+		resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("Login with wrong password", func(t *testing.T) {
+		// First create a user
+		signupReq := map[string]string{
+			"email":    "wrongpass@example.com",
+			"password": "CorrectPassword123!",
+			"name":     "Test User",
+		}
+
+		resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		// Verify email
+		token, _ := ts.authService.GenerateVerificationToken(context.Background(), "wrongpass@example.com")
+		verifyReq := map[string]string{"token": token}
+		resp = makeRequest(t, ts.server, "POST", "/auth/verify-email", verifyReq, nil)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		// Try to login with wrong password
+		loginReq := map[string]string{
+			"email":    "wrongpass@example.com",
+			"password": "WrongPassword123!",
+		}
+
+		resp = makeRequest(t, ts.server, "POST", "/auth/login", loginReq, nil)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
+
+	t.Run("Access protected route without token", func(t *testing.T) {
+		resp := makeRequest(t, ts.server, "GET", "/users/profile", nil, nil)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
+
+	t.Run("Access protected route with invalid token", func(t *testing.T) {
+		headers := map[string]string{
+			"Authorization": "Bearer invalid-token",
+		}
+
+		resp := makeRequest(t, ts.server, "GET", "/users/profile", nil, headers)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
+
+	t.Run("Duplicate email registration", func(t *testing.T) {
+		signupReq := map[string]string{
+			"email":    "duplicate@example.com",
+			"password": "SecurePassword123!",
+			"name":     "Test User",
+		}
+
+		// First registration
+		resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		// Duplicate registration
+		resp = makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
+	})
+}
+
+func TestIntegration_RateLimiting(t *testing.T) {
+	ts := SetupTestServer(t)
+	defer ts.Cleanup()
+
+	// Make requests up to the rate limit
+	for i := 0; i < ts.config.RateLimit.BurstSize; i++ {
+		loginReq := map[string]string{
+			"email":    fmt.Sprintf("test%d@example.com", i),
+			"password": "password",
+		}
+
+		resp := makeRequest(t, ts.server, "POST", "/auth/login", loginReq, nil)
+		// We expect 401 because credentials are invalid, but not rate limited
+		assert.NotEqual(t, http.StatusTooManyRequests, resp.StatusCode)
+	}
+
+	// Next request should be rate limited
 	loginReq := map[string]string{
-		"email":    "nonexistent@example.com",
-		"password": "WrongPassword",
+		"email":    "ratelimited@example.com",
+		"password": "password",
 	}
 
-	resp, err := makeRequest("POST", "/api/v1/auth/login", loginReq, nil)
-	if err != nil {
-		t.Fatalf("Login request failed: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status 401, got %d", resp.StatusCode)
-	}
+	resp := makeRequest(t, ts.server, "POST", "/auth/login", loginReq, nil)
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
 }
 
-func TestDuplicateSignup(t *testing.T) {
+func TestIntegration_HealthChecks(t *testing.T) {
+	ts := SetupTestServer(t)
+	defer ts.Cleanup()
+
+	t.Run("Health endpoint", func(t *testing.T) {
+		resp := makeRequest(t, ts.server, "GET", "/health", nil, nil)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var health map[string]interface{}
+		parseResponse(t, resp, &health)
+		assert.Equal(t, "ok", health["status"])
+	})
+
+	t.Run("Ready endpoint", func(t *testing.T) {
+		resp := makeRequest(t, ts.server, "GET", "/ready", nil, nil)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var ready map[string]interface{}
+		parseResponse(t, resp, &ready)
+		assert.Equal(t, "ok", ready["status"])
+		assert.Contains(t, ready, "database")
+	})
+}
+
+func TestIntegration_EmailVerificationFlow(t *testing.T) {
+	ts := SetupTestServer(t)
+	defer ts.Cleanup()
+
+	// Create unverified user
 	signupReq := map[string]string{
-		"email":    "duplicate@example.com",
-		"password": "TestPassword123",
+		"email":    "unverified@example.com",
+		"password": "SecurePassword123!",
+		"name":     "Unverified User",
 	}
 
-	// First signup
-	resp, err := makeRequest("POST", "/api/v1/auth/signup", signupReq, nil)
-	if err != nil {
-		t.Fatalf("First signup request failed: %v", err)
+	resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	// Try to login without verification
+	loginReq := map[string]string{
+		"email":    "unverified@example.com",
+		"password": "SecurePassword123!",
 	}
 
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Expected status 201, got %d", resp.StatusCode)
+	resp = makeRequest(t, ts.server, "POST", "/auth/login", loginReq, nil)
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+	// Resend verification email
+	resendReq := map[string]string{
+		"email": "unverified@example.com",
 	}
 
-	// Clear sent emails
-	testEmail.ClearEmails()
+	resp = makeRequest(t, ts.server, "POST", "/auth/resend-verification", resendReq, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Duplicate signup
-	resp, err = makeRequest("POST", "/api/v1/auth/signup", signupReq, nil)
-	if err != nil {
-		t.Fatalf("Duplicate signup request failed: %v", err)
-	}
+	// Check that 2 emails were sent
+	emailSvc := ts.emailService.(*mockEmailService)
+	emails := emailSvc.GetSentEmails("unverified@example.com")
+	assert.Len(t, emails, 2)
 
-	if resp.StatusCode != http.StatusConflict {
-		t.Errorf("Expected status 409, got %d", resp.StatusCode)
-	}
+	// Verify email
+	token, _ := ts.authService.GenerateVerificationToken(context.Background(), "unverified@example.com")
+	verifyReq := map[string]string{"token": token}
+	
+	resp = makeRequest(t, ts.server, "POST", "/auth/verify-email", verifyReq, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Now login should work
+	resp = makeRequest(t, ts.server, "POST", "/auth/login", loginReq, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
-func TestInvalidRefreshToken(t *testing.T) {
-	refreshReq := map[string]string{
-		"refresh_token": "invalid-refresh-token",
+func TestIntegration_TokenExpiration(t *testing.T) {
+	ts := SetupTestServer(t)
+	defer ts.Cleanup()
+
+	// Create a custom JWT service with very short expiration for testing
+	shortJWTService := token.NewService(ts.config.JWT.Secret)
+
+	// Create and verify a user
+	signupReq := map[string]string{
+		"email":    "expiry@example.com",
+		"password": "SecurePassword123!",
+		"name":     "Test User",
 	}
 
-	resp, err := makeRequest("POST", "/api/v1/auth/refresh", refreshReq, nil)
-	if err != nil {
-		t.Fatalf("Refresh request failed: %v", err)
+	resp := makeRequest(t, ts.server, "POST", "/auth/signup", signupReq, nil)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	verificationToken, _ := ts.authService.GenerateVerificationToken(context.Background(), "expiry@example.com")
+	verifyReq := map[string]string{"token": verificationToken}
+	resp = makeRequest(t, ts.server, "POST", "/auth/verify-email", verifyReq, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Create a token that expires in 1 second
+	claims := &token.Claims{
+		UserID: "test-user-id",
+		Email:  "expiry@example.com",
+	}
+	
+	shortToken, err := shortJWTService.GenerateToken(claims, 1*time.Second)
+	require.NoError(t, err)
+
+	// Token should work immediately
+	headers := map[string]string{
+		"Authorization": "Bearer " + shortToken,
 	}
 
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status 401, got %d", resp.StatusCode)
-	}
-}
+	// Wait for token to expire
+	time.Sleep(2 * time.Second)
 
-func TestHealthEndpoints(t *testing.T) {
-	// Health check
-	resp, err := makeRequest("GET", "/health", nil, nil)
-	if err != nil {
-		t.Fatalf("Health request failed: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
-
-	// Ready check
-	resp, err = makeRequest("GET", "/ready", nil, nil)
-	if err != nil {
-		t.Fatalf("Ready request failed: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
-
-	var readyResp map[string]interface{}
-	if err := parseResponse(resp, &readyResp); err != nil {
-		t.Fatalf("Failed to parse ready response: %v", err)
-	}
-
-	if readyResp["status"] != "ready" {
-		t.Errorf("Expected status 'ready', got %v", readyResp["status"])
-	}
+	// Token should now be expired
+	resp = makeRequest(t, ts.server, "GET", "/users/profile", nil, headers)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }

@@ -76,7 +76,11 @@ func RequireVerifiedEmail(next http.Handler) http.Handler {
 		// Check if email is verified (set by RequireAuth middleware)
 		emailVerified, ok := r.Context().Value("email_verified").(bool)
 		if !ok || !emailVerified {
-			response.WriteError(w, &emailNotVerifiedError{})
+			response.WriteJSON(w, http.StatusUnauthorized, map[string]interface{}{
+				"error":   "unauthorized",
+				"message": "Email verification required",
+				"code":    "EMAIL_NOT_VERIFIED",
+			})
 			return
 		}
 
@@ -89,4 +93,10 @@ type emailNotVerifiedError struct{}
 
 func (e *emailNotVerifiedError) Error() string {
 	return "email not verified"
+}
+
+// IsEmailNotVerified checks if the error is an email not verified error
+func IsEmailNotVerified(err error) bool {
+	_, ok := err.(*emailNotVerifiedError)
+	return ok
 }

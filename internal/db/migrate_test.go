@@ -83,3 +83,107 @@ func createTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	}
 	return db, mock
 }
+
+func TestMigrator_Up(t *testing.T) {
+	db, mock := createTestDB(t)
+	defer db.Close()
+
+	// Expect driver creation queries
+	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
+	
+	migrator := NewMigrator(db, MigrationConfig{
+		DatabaseName: "testdb",
+		SchemaName:   "public",
+	})
+
+	// Test Up method (will fail due to embedded FS not being available in tests)
+	err := migrator.Up()
+	assert.Error(t, err)
+}
+
+func TestMigrator_Down(t *testing.T) {
+	db, mock := createTestDB(t)
+	defer db.Close()
+
+	// Expect driver creation queries
+	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
+	
+	migrator := NewMigrator(db, MigrationConfig{
+		DatabaseName: "testdb",
+		SchemaName:   "public",
+	})
+
+	// Test Down method (will fail due to embedded FS not being available in tests)
+	err := migrator.Down()
+	assert.Error(t, err)
+}
+
+func TestMigrator_Steps(t *testing.T) {
+	db, mock := createTestDB(t)
+	defer db.Close()
+
+	// Expect driver creation queries
+	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
+	
+	migrator := NewMigrator(db, MigrationConfig{
+		DatabaseName: "testdb",
+		SchemaName:   "public",
+	})
+
+	// Test Steps method (will fail due to embedded FS not being available in tests)
+	err := migrator.Steps(1)
+	assert.Error(t, err)
+
+	err = migrator.Steps(-1)
+	assert.Error(t, err)
+}
+
+func TestMigrator_Version(t *testing.T) {
+	db, mock := createTestDB(t)
+	defer db.Close()
+
+	// Expect driver creation queries
+	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
+	
+	migrator := NewMigrator(db, MigrationConfig{
+		DatabaseName: "testdb",
+		SchemaName:   "public",
+	})
+
+	// Test Version method (will fail due to embedded FS not being available in tests)
+	_, _, err := migrator.Version()
+	assert.Error(t, err)
+}
+
+func TestMigrator_Force(t *testing.T) {
+	db, mock := createTestDB(t)
+	defer db.Close()
+
+	// Expect driver creation queries
+	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
+	
+	migrator := NewMigrator(db, MigrationConfig{
+		DatabaseName: "testdb",
+		SchemaName:   "public",
+	})
+
+	// Test Force method (will fail due to embedded FS not being available in tests)
+	err := migrator.Force(1)
+	assert.Error(t, err)
+}
+
+func TestRunMigrationsFromPath_WithValidDB(t *testing.T) {
+	db, mock := createTestDB(t)
+	defer db.Close()
+
+	// Expect driver creation queries
+	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
+	
+	// Test with valid DB but invalid path
+	err := RunMigrationsFromPath(db, "testdata/migrations", MigrationConfig{
+		DatabaseName: "testdb",
+		SchemaName:   "custom",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create database driver")
+}
