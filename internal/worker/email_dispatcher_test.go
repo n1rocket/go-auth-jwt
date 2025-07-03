@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/email"
+	"github.com/n1rocket/go-auth-jwt/internal/email"
 )
 
 func TestEmailDispatcher(t *testing.T) {

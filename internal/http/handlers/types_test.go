@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/abueno/go-auth-jwt/internal/http/handlers"
+	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
 )
 
 func TestSignupRequest_JSONSerialization(t *testing.T) {

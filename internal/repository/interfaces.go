@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/abueno/go-auth-jwt/internal/domain"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
 )
 
 // UserRepository defines the interface for user data access

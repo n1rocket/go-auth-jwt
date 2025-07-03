@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/domain"
-	"github.com/abueno/go-auth-jwt/internal/repository"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
+	"github.com/n1rocket/go-auth-jwt/internal/repository"
 )
 
 // RefreshTokenRepository implements repository.RefreshTokenRepository using PostgreSQL

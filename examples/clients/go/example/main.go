@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	client "github.com/abueno/go-auth-jwt/examples/clients/go"
+	client "github.com/n1rocket/go-auth-jwt/examples/clients/go"
 )
 
 func main() {

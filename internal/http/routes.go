@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/abueno/go-auth-jwt/internal/http/handlers"
-	"github.com/abueno/go-auth-jwt/internal/http/middleware"
-	"github.com/abueno/go-auth-jwt/internal/service"
-	"github.com/abueno/go-auth-jwt/internal/token"
+	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
+	"github.com/n1rocket/go-auth-jwt/internal/http/middleware"
+	"github.com/n1rocket/go-auth-jwt/internal/service"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
 )
 
 // Routes configures and returns the HTTP routes

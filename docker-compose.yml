@@ -1,4 +1,4 @@
-version: '3.8'
+# docker-compose.yml
 
 services:
   postgres:
@@ -35,31 +35,28 @@ services:
     ports:
       - "8080:8080"
     environment:
-      PORT: 8080
-      ENVIRONMENT: production
-      DATABASE_DSN: postgres://authuser:${DB_PASSWORD:-authpass}@postgres:5432/authdb?sslmode=disable
+      # Application
+      APP_PORT: 8080
+      APP_ENV: ${APP_ENV:-development}
+      # Database
+      DB_DSN: postgres://authuser:${DB_PASSWORD:-authpass}@postgres:5432/authdb?sslmode=disable
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-5}
+      # JWT
       JWT_SECRET: ${JWT_SECRET}
-      JWT_ISSUER: ${JWT_ISSUER:-auth-service}
-      JWT_ACCESS_TOKEN_DURATION: ${JWT_ACCESS_TOKEN_DURATION:-15m}
+      JWT_ISSUER: ${JWT_ISSUER:-go-auth-jwt}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
+      JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-168h}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      # Email
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
-      SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
-      CORS_ALLOWED_METHODS: ${CORS_ALLOWED_METHODS:-GET,POST,PUT,DELETE,OPTIONS}
-      CORS_ALLOWED_HEADERS: ${CORS_ALLOWED_HEADERS:-Authorization,Content-Type}
-      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-true}
-      CORS_MAX_AGE: ${CORS_MAX_AGE:-86400}
-      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
-      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-60}
-      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-10}
-      WORKER_POOL_SIZE: ${WORKER_POOL_SIZE:-10}
-      WORKER_QUEUE_SIZE: ${WORKER_QUEUE_SIZE:-100}
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Auth Service}
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       migrate:
         condition: service_completed_successfully

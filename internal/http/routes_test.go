@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/domain"
-	inthttp "github.com/abueno/go-auth-jwt/internal/http"
-	"github.com/abueno/go-auth-jwt/internal/http/handlers"
-	"github.com/abueno/go-auth-jwt/internal/security"
-	"github.com/abueno/go-auth-jwt/internal/service"
-	"github.com/abueno/go-auth-jwt/internal/token"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
+	inthttp "github.com/n1rocket/go-auth-jwt/internal/http"
+	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
+	"github.com/n1rocket/go-auth-jwt/internal/security"
+	"github.com/n1rocket/go-auth-jwt/internal/service"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
 )
 
 var ErrNotFound = errors.New("not found")

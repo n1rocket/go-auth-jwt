@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/metrics"
+	"github.com/n1rocket/go-auth-jwt/internal/metrics"
 )
 
 // ExporterConfig holds exporter configuration

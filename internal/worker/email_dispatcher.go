@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/email"
+	"github.com/n1rocket/go-auth-jwt/internal/email"
 )
 
 // EmailJob represents an email sending job

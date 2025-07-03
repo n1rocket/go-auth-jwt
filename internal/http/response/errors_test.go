@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/abueno/go-auth-jwt/internal/domain"
-	"github.com/abueno/go-auth-jwt/internal/token"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
 )
 
 func TestWriteError(t *testing.T) {

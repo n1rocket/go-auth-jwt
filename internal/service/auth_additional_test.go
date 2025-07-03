@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/domain"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
 )
 
 func TestAuthService_Logout(t *testing.T) {

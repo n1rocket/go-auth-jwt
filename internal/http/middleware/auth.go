@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/abueno/go-auth-jwt/internal/http/request"
-	"github.com/abueno/go-auth-jwt/internal/http/response"
-	"github.com/abueno/go-auth-jwt/internal/http/handlers"
-	"github.com/abueno/go-auth-jwt/internal/token"
+	"github.com/n1rocket/go-auth-jwt/internal/http/request"
+	"github.com/n1rocket/go-auth-jwt/internal/http/response"
+	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
 )
 
 // RequireAuth is a middleware that validates JWT tokens

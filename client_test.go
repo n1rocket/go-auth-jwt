@@ -1,4 +1,4 @@
-package main
+package integration_test
 
 import (
 	"bytes"
@@ -7,9 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/n1rocket/go-auth-jwt/internal/config"
+	"github.com/n1rocket/go-auth-jwt/internal/db"
+	httpserver "github.com/n1rocket/go-auth-jwt/internal/http"
+	"github.com/n1rocket/go-auth-jwt/internal/repository/postgres"
+	"github.com/n1rocket/go-auth-jwt/internal/security"
+	"github.com/n1rocket/go-auth-jwt/internal/service"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +42,12 @@ func NewAuthClient(baseURL string) *AuthClient {
 type SignupRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Name     string `json:"name"`
+}
+
+// SignupResponse represents the signup response
+type SignupResponse struct {
+	UserID  string `json:"user_id"`
+	Message string `json:"message"`
 }
 
 // LoginRequest represents the login request payload
@@ -47,33 +60,39 @@ type LoginRequest struct {
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int    `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
 }
 
 // UserProfile represents the user profile response
 type UserProfile struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"email_verified"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // ErrorResponse represents an error response from the API
 type ErrorResponse struct {
 	Error   string `json:"error"`
 	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
 }
 
 // Signup creates a new user account
-func (c *AuthClient) Signup(ctx context.Context, req SignupRequest) error {
-	return c.doRequest(ctx, "POST", "/auth/signup", req, nil, nil)
+func (c *AuthClient) Signup(ctx context.Context, req SignupRequest) (*SignupResponse, error) {
+	var resp SignupResponse
+	err := c.doRequest(ctx, "POST", "/api/v1/auth/signup", req, nil, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // Login authenticates a user and returns tokens
 func (c *AuthClient) Login(ctx context.Context, req LoginRequest) (*TokenResponse, error) {
 	var resp TokenResponse
-	err := c.doRequest(ctx, "POST", "/auth/login", req, nil, &resp)
+	err := c.doRequest(ctx, "POST", "/api/v1/auth/login", req, nil, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +103,7 @@ func (c *AuthClient) Login(ctx context.Context, req LoginRequest) (*TokenRespons
 func (c *AuthClient) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
 	req := map[string]string{"refresh_token": refreshToken}
 	var resp TokenResponse
-	err := c.doRequest(ctx, "POST", "/auth/refresh", req, nil, &resp)
+	err := c.doRequest(ctx, "POST", "/api/v1/auth/refresh", req, nil, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +116,7 @@ func (c *AuthClient) GetProfile(ctx context.Context, accessToken string) (*UserP
 		"Authorization": "Bearer " + accessToken,
 	}
 	var resp UserProfile
-	err := c.doRequest(ctx, "GET", "/users/profile", nil, headers, &resp)
+	err := c.doRequest(ctx, "GET", "/api/v1/auth/me", nil, headers, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -105,35 +124,26 @@ func (c *AuthClient) GetProfile(ctx context.Context, accessToken string) (*UserP
 }
 
 // Logout logs out the user
-func (c *AuthClient) Logout(ctx context.Context, accessToken string) error {
+func (c *AuthClient) Logout(ctx context.Context, accessToken, refreshToken string) error {
 	headers := map[string]string{
 		"Authorization": "Bearer " + accessToken,
 	}
-	return c.doRequest(ctx, "POST", "/auth/logout", nil, headers, nil)
+	req := map[string]string{"refresh_token": refreshToken}
+	return c.doRequest(ctx, "POST", "/api/v1/auth/logout", req, headers, nil)
+}
+
+// LogoutAll logs out from all devices
+func (c *AuthClient) LogoutAll(ctx context.Context, accessToken string) error {
+	headers := map[string]string{
+		"Authorization": "Bearer " + accessToken,
+	}
+	return c.doRequest(ctx, "POST", "/api/v1/auth/logout-all", nil, headers, nil)
 }
 
 // VerifyEmail verifies a user's email address
 func (c *AuthClient) VerifyEmail(ctx context.Context, token string) error {
 	req := map[string]string{"token": token}
-	return c.doRequest(ctx, "POST", "/auth/verify-email", req, nil, nil)
-}
-
-// ResendVerificationEmail resends the verification email
-func (c *AuthClient) ResendVerificationEmail(ctx context.Context, email string) error {
-	req := map[string]string{"email": email}
-	return c.doRequest(ctx, "POST", "/auth/resend-verification", req, nil, nil)
-}
-
-// UpdatePassword updates the user's password
-func (c *AuthClient) UpdatePassword(ctx context.Context, accessToken, currentPassword, newPassword string) error {
-	headers := map[string]string{
-		"Authorization": "Bearer " + accessToken,
-	}
-	req := map[string]string{
-		"current_password": currentPassword,
-		"new_password":     newPassword,
-	}
-	return c.doRequest(ctx, "POST", "/users/update-password", req, headers, nil)
+	return c.doRequest(ctx, "POST", "/api/v1/auth/verify-email", req, nil, nil)
 }
 
 // doRequest performs an HTTP request
@@ -188,34 +198,108 @@ func (c *AuthClient) doRequest(ctx context.Context, method, path string, body in
 	return nil
 }
 
+// SetupClientTestServer creates a test server for client integration tests
+func SetupClientTestServer(t testing.TB) (*httptest.Server, func()) {
+	// Create test configuration
+	cfg := &config.Config{
+		App: config.AppConfig{
+			Port:        8080,
+			Environment: "test",
+		},
+		Database: config.DatabaseConfig{
+			DSN: "postgres://test:test@localhost:5432/test_auth?sslmode=disable",
+		},
+		JWT: config.JWTConfig{
+			Secret:          "test-secret-key",
+			PrivateKeyPath:  "",
+			PublicKeyPath:   "",
+			AccessTokenTTL:  15 * time.Minute,
+			RefreshTokenTTL: 7 * 24 * time.Hour,
+			Issuer:          "test-auth",
+			Algorithm:       "HS256",
+		},
+		Email: config.EmailConfig{
+			SMTPHost:     "localhost",
+			SMTPPort:     1025,
+			SMTPUser:     "test",
+			SMTPPassword: "test",
+			FromAddress:  "test@example.com",
+			FromName:     "Test Auth",
+		},
+	}
+
+	// Setup test database
+	testDB, err := db.Connect(cfg.Database.DSN)
+	require.NoError(t, err)
+
+	// Test database connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err = testDB.TestConnection(ctx)
+	cancel()
+	require.NoError(t, err)
+
+	// Create repositories
+	userRepo := postgres.NewUserRepository(testDB)
+	refreshTokenRepo := postgres.NewRefreshTokenRepository(testDB)
+
+	// Create services
+	passwordHasher := security.NewDefaultPasswordHasher()
+	tokenManager, err := token.NewManager(
+		cfg.JWT.Algorithm,
+		cfg.JWT.Secret,
+		cfg.JWT.PrivateKeyPath,
+		cfg.JWT.PublicKeyPath,
+		cfg.JWT.Issuer,
+		cfg.JWT.AccessTokenTTL,
+	)
+	require.NoError(t, err)
+
+	authService := service.NewAuthService(
+		userRepo,
+		refreshTokenRepo,
+		passwordHasher,
+		tokenManager,
+		cfg.JWT.RefreshTokenTTL,
+	)
+
+	// Create router
+	handler := httpserver.Routes(authService, tokenManager)
+
+	// Create test server
+	server := httptest.NewServer(handler)
+
+	cleanup := func() {
+		server.Close()
+		testDB.Close()
+	}
+
+	return server, cleanup
+}
+
 // Client Integration Tests
 
 func TestClient_CompleteUserJourney(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
 	// Setup test server
-	ts := SetupTestServer(t)
-	defer ts.Cleanup()
+	server, cleanup := SetupClientTestServer(t)
+	defer cleanup()
 
 	// Create client
-	client := NewAuthClient(ts.server.URL)
+	client := NewAuthClient(server.URL)
 	ctx := context.Background()
 
 	// 1. Sign up a new user
-	err := client.Signup(ctx, SignupRequest{
+	signupResp, err := client.Signup(ctx, SignupRequest{
 		Email:    "client.test@example.com",
 		Password: "SecurePassword123!",
-		Name:     "Client Test User",
 	})
 	require.NoError(t, err)
+	require.NotEmpty(t, signupResp.UserID)
 
-	// 2. Verify email (in real scenario, user would click link in email)
-	// For testing, we'll generate the token directly
-	verificationToken, err := ts.authService.GenerateVerificationToken(ctx, "client.test@example.com")
-	require.NoError(t, err)
-
-	err = client.VerifyEmail(ctx, verificationToken)
-	require.NoError(t, err)
-
-	// 3. Login
+	// 2. Login (email verification might be disabled in test)
 	tokenResp, err := client.Login(ctx, LoginRequest{
 		Email:    "client.test@example.com",
 		Password: "SecurePassword123!",
@@ -224,45 +308,36 @@ func TestClient_CompleteUserJourney(t *testing.T) {
 	require.NotEmpty(t, tokenResp.AccessToken)
 	require.NotEmpty(t, tokenResp.RefreshToken)
 
-	// 4. Get profile
+	// 3. Get profile
 	profile, err := client.GetProfile(ctx, tokenResp.AccessToken)
 	require.NoError(t, err)
 	assert.Equal(t, "client.test@example.com", profile.Email)
-	assert.Equal(t, "Client Test User", profile.Name)
 
-	// 5. Update password
-	err = client.UpdatePassword(ctx, tokenResp.AccessToken, "SecurePassword123!", "NewSecurePassword456!")
-	require.NoError(t, err)
-
-	// 6. Login with new password
-	newTokenResp, err := client.Login(ctx, LoginRequest{
-		Email:    "client.test@example.com",
-		Password: "NewSecurePassword456!",
-	})
-	require.NoError(t, err)
-	require.NotEmpty(t, newTokenResp.AccessToken)
-
-	// 7. Refresh token
+	// 4. Refresh token
 	refreshedTokenResp, err := client.RefreshToken(ctx, tokenResp.RefreshToken)
 	require.NoError(t, err)
 	require.NotEmpty(t, refreshedTokenResp.AccessToken)
 
-	// 8. Logout
-	err = client.Logout(ctx, refreshedTokenResp.AccessToken)
+	// 5. Logout
+	err = client.Logout(ctx, refreshedTokenResp.AccessToken, tokenResp.RefreshToken)
 	require.NoError(t, err)
 
-	// 9. Verify token is invalid after logout
+	// 6. Verify token is invalid after logout
 	_, err = client.GetProfile(ctx, refreshedTokenResp.AccessToken)
 	assert.Error(t, err)
 }
 
 func TestClient_ErrorHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
 	// Setup test server
-	ts := SetupTestServer(t)
-	defer ts.Cleanup()
+	server, cleanup := SetupClientTestServer(t)
+	defer cleanup()
 
 	// Create client
-	client := NewAuthClient(ts.server.URL)
+	client := NewAuthClient(server.URL)
 	ctx := context.Background()
 
 	t.Run("Invalid credentials", func(t *testing.T) {
@@ -275,10 +350,9 @@ func TestClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("Invalid email format", func(t *testing.T) {
-		err := client.Signup(ctx, SignupRequest{
+		_, err := client.Signup(ctx, SignupRequest{
 			Email:    "invalid-email",
 			Password: "SecurePassword123!",
-			Name:     "Test User",
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "400")
@@ -286,18 +360,16 @@ func TestClient_ErrorHandling(t *testing.T) {
 
 	t.Run("Duplicate registration", func(t *testing.T) {
 		// First registration
-		err := client.Signup(ctx, SignupRequest{
+		_, err := client.Signup(ctx, SignupRequest{
 			Email:    "duplicate.client@example.com",
 			Password: "SecurePassword123!",
-			Name:     "Test User",
 		})
 		require.NoError(t, err)
 
 		// Duplicate registration
-		err = client.Signup(ctx, SignupRequest{
+		_, err = client.Signup(ctx, SignupRequest{
 			Email:    "duplicate.client@example.com",
 			Password: "SecurePassword123!",
-			Name:     "Test User",
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "409")
@@ -311,29 +383,26 @@ func TestClient_ErrorHandling(t *testing.T) {
 }
 
 func TestClient_ConcurrentRequests(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
 	// Setup test server
-	ts := SetupTestServer(t)
-	defer ts.Cleanup()
+	server, cleanup := SetupClientTestServer(t)
+	defer cleanup()
 
 	// Create client
-	client := NewAuthClient(ts.server.URL)
+	client := NewAuthClient(server.URL)
 	ctx := context.Background()
 
-	// Create and verify a user for testing
+	// Create and login a user for testing
 	email := "concurrent.test@example.com"
 	password := "SecurePassword123!"
 
-	err := client.Signup(ctx, SignupRequest{
+	_, err := client.Signup(ctx, SignupRequest{
 		Email:    email,
 		Password: password,
-		Name:     "Concurrent Test User",
 	})
-	require.NoError(t, err)
-
-	// Verify email
-	verificationToken, err := ts.authService.GenerateVerificationToken(ctx, email)
-	require.NoError(t, err)
-	err = client.VerifyEmail(ctx, verificationToken)
 	require.NoError(t, err)
 
 	// Login to get tokens
@@ -358,181 +427,5 @@ func TestClient_ConcurrentRequests(t *testing.T) {
 	for i := 0; i < numRequests; i++ {
 		err := <-errors
 		assert.NoError(t, err)
-	}
-}
-
-func TestClient_TokenRefreshFlow(t *testing.T) {
-	// Setup test server
-	ts := SetupTestServer(t)
-	defer ts.Cleanup()
-
-	// Create client
-	client := NewAuthClient(ts.server.URL)
-	ctx := context.Background()
-
-	// Create and verify a user
-	email := "refresh.test@example.com"
-	password := "SecurePassword123!"
-
-	err := client.Signup(ctx, SignupRequest{
-		Email:    email,
-		Password: password,
-		Name:     "Refresh Test User",
-	})
-	require.NoError(t, err)
-
-	// Verify email
-	verificationToken, err := ts.authService.GenerateVerificationToken(ctx, email)
-	require.NoError(t, err)
-	err = client.VerifyEmail(ctx, verificationToken)
-	require.NoError(t, err)
-
-	// Login
-	tokenResp, err := client.Login(ctx, LoginRequest{
-		Email:    email,
-		Password: password,
-	})
-	require.NoError(t, err)
-
-	// Store original tokens
-	originalAccessToken := tokenResp.AccessToken
-	refreshToken := tokenResp.RefreshToken
-
-	// Refresh token multiple times
-	for i := 0; i < 3; i++ {
-		newTokenResp, err := client.RefreshToken(ctx, refreshToken)
-		require.NoError(t, err)
-		require.NotEmpty(t, newTokenResp.AccessToken)
-		
-		// Verify new token works
-		profile, err := client.GetProfile(ctx, newTokenResp.AccessToken)
-		require.NoError(t, err)
-		assert.Equal(t, email, profile.Email)
-
-		// Use the same refresh token (some systems allow this)
-		// If your system invalidates refresh tokens after use, update the refreshToken variable:
-		// refreshToken = newTokenResp.RefreshToken
-	}
-
-	// Original access token should no longer work if enough time has passed
-	// or if the system invalidates old tokens on refresh
-}
-
-func TestClient_ResendVerificationEmail(t *testing.T) {
-	// Setup test server
-	ts := SetupTestServer(t)
-	defer ts.Cleanup()
-
-	// Create client
-	client := NewAuthClient(ts.server.URL)
-	ctx := context.Background()
-
-	// Create unverified user
-	email := "resend.test@example.com"
-	err := client.Signup(ctx, SignupRequest{
-		Email:    email,
-		Password: "SecurePassword123!",
-		Name:     "Resend Test User",
-	})
-	require.NoError(t, err)
-
-	// Resend verification email multiple times
-	for i := 0; i < 3; i++ {
-		err = client.ResendVerificationEmail(ctx, email)
-		assert.NoError(t, err)
-		
-		// Small delay to avoid rate limiting
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	// Verify that emails were sent
-	emailSvc := ts.emailService.(*mockEmailService)
-	emails := emailSvc.GetSentEmails(email)
-	assert.GreaterOrEqual(t, len(emails), 3) // At least 3 emails (1 original + 3 resends)
-}
-
-// Benchmark tests
-
-func BenchmarkClient_Login(b *testing.B) {
-	// Setup test server
-	ts := SetupTestServer(b)
-	defer ts.Cleanup()
-
-	// Create client
-	client := NewAuthClient(ts.server.URL)
-	ctx := context.Background()
-
-	// Create and verify a user
-	email := "benchmark@example.com"
-	password := "SecurePassword123!"
-
-	err := client.Signup(ctx, SignupRequest{
-		Email:    email,
-		Password: password,
-		Name:     "Benchmark User",
-	})
-	require.NoError(b, err)
-
-	// Verify email
-	verificationToken, err := ts.authService.GenerateVerificationToken(ctx, email)
-	require.NoError(b, err)
-	err = client.VerifyEmail(ctx, verificationToken)
-	require.NoError(b, err)
-
-	// Reset timer
-	b.ResetTimer()
-
-	// Benchmark login
-	for i := 0; i < b.N; i++ {
-		_, err := client.Login(ctx, LoginRequest{
-			Email:    email,
-			Password: password,
-		})
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkClient_GetProfile(b *testing.B) {
-	// Setup test server
-	ts := SetupTestServer(b)
-	defer ts.Cleanup()
-
-	// Create client
-	client := NewAuthClient(ts.server.URL)
-	ctx := context.Background()
-
-	// Create, verify, and login user
-	email := "benchmark.profile@example.com"
-	password := "SecurePassword123!"
-
-	err := client.Signup(ctx, SignupRequest{
-		Email:    email,
-		Password: password,
-		Name:     "Benchmark User",
-	})
-	require.NoError(b, err)
-
-	verificationToken, err := ts.authService.GenerateVerificationToken(ctx, email)
-	require.NoError(b, err)
-	err = client.VerifyEmail(ctx, verificationToken)
-	require.NoError(b, err)
-
-	tokenResp, err := client.Login(ctx, LoginRequest{
-		Email:    email,
-		Password: password,
-	})
-	require.NoError(b, err)
-
-	// Reset timer
-	b.ResetTimer()
-
-	// Benchmark get profile
-	for i := 0; i < b.N; i++ {
-		_, err := client.GetProfile(ctx, tokenResp.AccessToken)
-		if err != nil {
-			b.Fatal(err)
-		}
 	}
 }

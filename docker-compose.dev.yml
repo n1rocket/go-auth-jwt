@@ -1,4 +1,5 @@
-version: '3.8'
+# docker-compose.dev.yml
+# Development environment with PostgreSQL, MailHog, and Redis
 
 services:
   postgres:
@@ -37,6 +38,19 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    image: migrate/migrate
+    volumes:
+      - ./migrations:/migrations
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://postgres:postgres@postgres:5432/authdb_dev?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build: 
       context: .
@@ -44,19 +58,30 @@ services:
     ports:
       - "8080:8080"
     environment:
-      PORT: 8080
-      ENVIRONMENT: development
-      DATABASE_DSN: postgres://postgres:postgres@postgres:5432/authdb_dev?sslmode=disable
+      # Application
+      APP_PORT: 8080
+      APP_ENV: development
+      # Database
+      DB_DSN: postgres://postgres:postgres@postgres:5432/authdb_dev?sslmode=disable
+      DB_MAX_OPEN_CONNS: 25
+      DB_MAX_IDLE_CONNS: 5
+      # JWT
       JWT_SECRET: dev-secret-key-for-testing-only
-      JWT_ISSUER: auth-dev
-      JWT_ACCESS_TOKEN_DURATION: 15m
+      JWT_ISSUER: go-auth-jwt
+      JWT_ACCESS_TOKEN_TTL: 15m
+      JWT_REFRESH_TOKEN_TTL: 168h
       JWT_ALGORITHM: HS256
+      # Email
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
-      SMTP_USERNAME: ""
-      SMTP_PASSWORD: ""
-      SMTP_FROM_ADDRESS: noreply@localhost
-      SMTP_FROM_NAME: Auth Service Dev
+      SMTP_USER: test@example.com
+      SMTP_PASS: password
+      EMAIL_FROM_ADDRESS: noreply@localhost
+      EMAIL_FROM_NAME: Auth Service Dev
+      EMAIL_WORKER_COUNT: 5
+      EMAIL_QUEUE_SIZE: 100
+      # Logging
+      LOG_LEVEL: debug
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost:8080
       CORS_ALLOWED_METHODS: GET,POST,PUT,DELETE,OPTIONS
       CORS_ALLOWED_HEADERS: Authorization,Content-Type
@@ -68,15 +93,15 @@ services:
       APP_BASE_URL: http://localhost:8080
       FRONTEND_URL: http://localhost:3000
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       mailhog:
         condition: service_started
-    volumes:
-      - ./cmd:/app/cmd
-      - ./internal:/app/internal
-      - ./migrations:/app/migrations
-    command: ["sh", "-c", "go run cmd/api/main.go"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_dev_data:

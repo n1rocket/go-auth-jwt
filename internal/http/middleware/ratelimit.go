@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/http/response"
+	"github.com/n1rocket/go-auth-jwt/internal/http/response"
 )
 
 // RateLimiter implements token bucket algorithm for rate limiting

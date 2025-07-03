@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/abueno/go-auth-jwt/internal/http/handlers"
+	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
 )
 
 func TestReady(t *testing.T) {

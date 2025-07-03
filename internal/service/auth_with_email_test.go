@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/config"
-	"github.com/abueno/go-auth-jwt/internal/domain"
-	"github.com/abueno/go-auth-jwt/internal/email"
-	"github.com/abueno/go-auth-jwt/internal/repository"
-	"github.com/abueno/go-auth-jwt/internal/security"
-	"github.com/abueno/go-auth-jwt/internal/token"
-	"github.com/abueno/go-auth-jwt/internal/worker"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
+	"github.com/n1rocket/go-auth-jwt/internal/email"
+	"github.com/n1rocket/go-auth-jwt/internal/repository"
+	"github.com/n1rocket/go-auth-jwt/internal/security"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
+	"github.com/n1rocket/go-auth-jwt/internal/worker"
 )
 
 // mockEmailService for testing

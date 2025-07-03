@@ -22,12 +22,14 @@ The JWT Authentication Service includes comprehensive monitoring and metrics col
 ## Metrics Types
 
 ### HTTP Metrics
+
 - `http_requests_total` - Total number of HTTP requests
 - `http_request_duration_seconds` - Request latency histogram
 - `http_requests_in_flight` - Current number of requests being processed
 - `http_response_size_bytes` - Response size histogram
 
 ### Authentication Metrics
+
 - `auth_login_attempts_total` - Total login attempts
 - `auth_login_success_total` - Successful logins
 - `auth_login_failure_total` - Failed logins
@@ -40,24 +42,28 @@ The JWT Authentication Service includes comprehensive monitoring and metrics col
 - `auth_active_sessions` - Current active sessions
 
 ### Email Metrics
+
 - `email_sent_total` - Emails sent successfully
 - `email_failed_total` - Failed email attempts
 - `email_queue_size` - Current email queue size
 - `email_send_duration_seconds` - Email send latency
 
 ### Database Metrics
+
 - `db_connections_active` - Active database connections
 - `db_queries_total` - Total database queries
 - `db_query_duration_seconds` - Query execution time
 - `db_errors_total` - Database errors
 
 ### System Metrics
+
 - `go_goroutines` - Number of goroutines
 - `go_memory_allocated_bytes` - Allocated memory
 - `go_memory_total_bytes` - Total memory from OS
 - `go_gc_pause_seconds` - GC pause durations
 
 ### Business Metrics
+
 - `users_total` - Total registered users
 - `users_active` - Active users
 - `users_verified_total` - Verified users
@@ -65,6 +71,7 @@ The JWT Authentication Service includes comprehensive monitoring and metrics col
 - `verifications_sent_total` - Verification emails sent
 
 ### Rate Limiting Metrics
+
 - `rate_limit_hits_total` - Rate limit checks
 - `rate_limit_exceeded_total` - Rate limit exceeded events
 
@@ -112,7 +119,7 @@ monitor := monitoring.NewMonitor(monitorConfig, logger)
 ### 1. Add Metrics Middleware
 
 ```go
-import "github.com/abueno/go-auth-jwt/internal/http/middleware"
+import "github.com/n1rocket/go-auth-jwt/internal/http/middleware"
 
 // Get metrics instance
 metrics := monitor.Metrics()
@@ -189,9 +196,9 @@ metadata:
     prometheus.io/path: "/metrics"
 spec:
   ports:
-  - name: metrics
-    port: 9090
-    targetPort: 9090
+    - name: metrics
+      port: 9090
+      targetPort: 9090
 ```
 
 ## Monitoring Stack Setup
@@ -221,10 +228,12 @@ docker-compose -f docker-compose.monitoring.yml up -d
 ### Critical Alerts
 
 1. **Service Down**
+
    - Condition: Service unreachable for 1 minute
    - Action: Check service health, restart if needed
 
 2. **High Error Rate**
+
    - Condition: Error rate > 5% for 5 minutes
    - Action: Check logs, investigate errors
 
@@ -235,10 +244,12 @@ docker-compose -f docker-compose.monitoring.yml up -d
 ### Warning Alerts
 
 1. **High Login Failure Rate**
+
    - Condition: > 50% login failures
    - Action: Check for attacks, review logs
 
 2. **Email Queue Backup**
+
    - Condition: > 100 emails queued
    - Action: Check SMTP service
 
@@ -251,8 +262,9 @@ docker-compose -f docker-compose.monitoring.yml up -d
 ### 1. Metric Naming
 
 Follow Prometheus naming conventions:
+
 - Use lowercase with underscores
-- Include unit suffix (_total, _seconds, _bytes)
+- Include unit suffix (\_total, \_seconds, \_bytes)
 - Be descriptive but concise
 
 ### 2. Label Usage
@@ -269,6 +281,7 @@ metrics.LoginAttempts.WithLabels(labels).Inc()
 ### 3. Cardinality Control
 
 Avoid high-cardinality labels:
+
 - ❌ User ID, Session ID, Request ID
 - ✅ Status code, Method, Endpoint pattern
 
@@ -347,7 +360,7 @@ metrics.DailyActiveUsers.Set(float64(count))
 
 ```go
 // Track SLI for availability
-available := metrics.SuccessfulRequests.Value() / 
+available := metrics.SuccessfulRequests.Value() /
              metrics.TotalRequests.Value()
 
 // Track SLI for latency

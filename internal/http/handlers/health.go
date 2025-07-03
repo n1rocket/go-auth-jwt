@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/abueno/go-auth-jwt/internal/http/response"
+	"github.com/n1rocket/go-auth-jwt/internal/http/response"
 )
 
 // HealthResponse represents the health check response

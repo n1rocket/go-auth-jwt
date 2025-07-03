@@ -1,9 +1,7 @@
 -- Remove audit tables
 BEGIN;
 
--- Drop trigger
-DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-DROP FUNCTION IF EXISTS update_updated_at_column();
+-- Note: The trigger and function are handled in migration 000001
 
 -- Drop indexes
 DROP INDEX IF EXISTS idx_audit_logs_user_id;

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/abueno/go-auth-jwt/internal/config"
-	emailpkg "github.com/abueno/go-auth-jwt/internal/email"
-	"github.com/abueno/go-auth-jwt/internal/worker"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
+	emailpkg "github.com/n1rocket/go-auth-jwt/internal/email"
+	"github.com/n1rocket/go-auth-jwt/internal/worker"
 )
 
 // AuthServiceWithEmail extends AuthService with email functionality

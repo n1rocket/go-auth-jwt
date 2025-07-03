@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/abueno/go-auth-jwt/internal/http/response"
+	"github.com/n1rocket/go-auth-jwt/internal/http/response"
 )
 
 // MaxRequestBodySize is the maximum allowed request body size (1MB)

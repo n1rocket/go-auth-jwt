@@ -1,4 +1,4 @@
-module github.com/abueno/go-auth-jwt
+module github.com/n1rocket/go-auth-jwt
 
 go 1.23.0
 

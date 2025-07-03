@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/abueno/go-auth-jwt/internal/config"
-	"github.com/abueno/go-auth-jwt/internal/db"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
+	"github.com/n1rocket/go-auth-jwt/internal/db"
 	_ "github.com/lib/pq"
 )
 

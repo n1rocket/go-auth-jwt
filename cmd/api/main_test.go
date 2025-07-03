@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/config"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
 )
 
 // Mock os.Exit for testing

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/config"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 

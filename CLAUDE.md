@@ -10,49 +10,89 @@ This is a JWT Authentication Provider built exclusively with Go's standard libra
 
 ### Clean Architecture Structure
 
-- `cmd/`: Application entrypoints (main.go for the API server)
+- `cmd/`: Application entrypoints
+  - `api/`: Main API server with graceful shutdown
+  - `migrate/`: Database migration CLI tool
 - `internal/`: Core business logic and internal packages
-  - `config/`: Centralized configuration management
+  - `config/`: Centralized configuration management with validation
   - `domain/`: Business entities (User)
   - `service/`: Business logic (AuthService)
   - `repository/`: Data access layer (UserRepo interface)
-  - `http/`: HTTP transport layer (handlers, middleware)
+    - `postgres/`: PostgreSQL implementation with pgx/v5
+  - `http/`: HTTP transport layer
+    - `handlers/`: Request handlers
+    - `middleware/`: Auth, CORS, rate limiting, security headers
+    - `request/`: Request validation
+    - `response/`: Response helpers and error handling
   - `token/`: JWT token management (HS256/RS256)
-  - `worker/`: Asynchronous tasks (email dispatcher)
+  - `worker/`: Asynchronous tasks (email dispatcher with worker pool)
+  - `email/`: Email service with SMTP implementation
+  - `metrics/`: Custom metrics implementation
+  - `monitoring/`: Observability features
+  - `db/`: Database connection and migration management
+  - `security/`: Password hashing and security utilities
 - `pkg/`: Reusable packages
-- `deploy/`: Deployment configurations (Docker, docker-compose)
+- `deploy/`: Deployment configurations (Docker, docker-compose, k8s)
 - `scripts/`: Utility scripts (migrations, k6 tests)
 - `docs/`: Documentation (OpenAPI, architecture diagrams)
+- `examples/`: Client examples (Go, JavaScript, Python, React)
+- `migrations/`: SQL migration files
 
 ### Key Dependencies
 
-- `golang-jwt/jwt v5.2.2`: JWT token handling
-- `pgx v5.7.5`: PostgreSQL driver
-- `sqlx v1.4.0`: SQL extensions
-- `prometheus/client_golang v1.22.0`: Metrics
-- `opentelemetry-go v1.37.0`: Distributed tracing
+- `golang-jwt/jwt v5`: JWT token handling
+- `jackc/pgx/v5`: PostgreSQL driver
+- `golang-migrate/migrate/v4`: Database migrations
+- No web framework - uses standard library `net/http`
 
 ## Development Commands
 
 ```bash
+# Setup and dependencies
+make setup                  # Install development tools (golangci-lint, gosec, swag, migrate)
+make mod                    # Download and tidy Go modules
+
 # Run the application
 make run                    # Start API on :8080
+make dev                    # Run with hot reload (requires air)
 
 # Testing
-make test                   # Run unit tests with t.Parallel
+make test                   # Run unit tests with coverage report
 make test-integration       # Run integration tests with dockertest
+make test-e2e              # Run e2e tests with k6
+make test-all              # Run all tests
 make bench                  # Run benchmarks for JWT operations
+go test -run TestSpecific   # Run a specific test
 
 # Code quality
 make lint                   # Run golangci-lint
-gosec ./...                # Security analysis
+make lint-fix              # Run golangci-lint with auto-fix
+make security-scan         # Run gosec security analysis
+make vuln-check           # Check for known vulnerabilities
+make fmt                   # Format code
+make vet                  # Run go vet
+
+# Database
+make migrate-up            # Apply all pending migrations
+make migrate-down          # Rollback last migration
+make migrate-create name=X # Create new migration file
 
 # Docker
-docker compose up           # Start all services (API, PostgreSQL, Prometheus, Grafana)
-make docker-build          # Build multi-stage Docker image (<20MB)
+make docker-build          # Build Docker image
+make compose-up            # Start all services (API, PostgreSQL, Prometheus, Grafana)
+make compose-down          # Stop all services
+make compose-logs          # View docker-compose logs
+make dev-up               # Start development environment with MailHog
+make dev-down             # Stop development environment
 
 # Documentation
-swag init                  # Generate OpenAPI documentation
+make docs                  # Generate OpenAPI documentation with swag
+
+# Utilities
+make keys                  # Generate RSA key pair for JWT (RS256)
+make mock                  # Generate mocks with mockery
+make clean                # Clean build artifacts and caches
+make ci                   # Run CI checks locally (lint, test, security-scan)
 ```
 
 ## Database Schema
@@ -180,11 +220,83 @@ SMTP_PORT=587                                           # Email port
 
 GitHub Actions workflow includes:
 
-1. Linting with golangci-lint v2.2.0
-2. Unit and integration tests (Go 1.24, 1.25-beta)
+1. Linting with golangci-lint v1.62.2
+2. Unit and integration tests (Go 1.21+)
 3. Security scanning with gosec v2.22.5
 4. Docker image build and push to GHCR
 5. Release notes generation with SemVer
+
+Workflows:
+- `.github/workflows/ci.yml`: Runs on PRs and pushes to main/develop
+- `.github/workflows/deploy.yml`: Handles deployment to production
+
+## Testing Patterns
+
+### Unit Tests
+- Use table-driven tests for comprehensive coverage
+- Tests use `t.Parallel()` for faster execution
+- Mock interfaces using mockery-generated mocks
+- Test files follow `*_test.go` naming convention
+
+### Integration Tests
+- Use build tag `//go:build integration`
+- Real PostgreSQL database using dockertest
+- Located in `internal/test/integration/`
+- Run with: `make test-integration`
+
+### Running Specific Tests
+```bash
+# Run a single test
+go test -run TestAuthService_Login ./internal/service
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run tests in a specific package
+go test ./internal/http/handlers/...
+
+# Run with race detector
+go test -race ./...
+```
+
+## Common Development Tasks
+
+### Running Local Development Environment
+```bash
+# Start everything with docker-compose
+make dev-up
+
+# This starts:
+# - API on http://localhost:8080
+# - PostgreSQL on localhost:5432
+# - MailHog on http://localhost:8025 (email testing)
+# - Database is automatically migrated
+
+# View logs
+make dev-logs
+
+# Stop everything
+make dev-down
+```
+
+### Working with JWT Tokens
+- Development uses HS256 with `JWT_SECRET` environment variable
+- Production should use RS256 with key files
+- Generate RSA keys: `make keys`
+- Access tokens expire in 15 minutes by default
+- Refresh tokens expire in 7 days by default
+
+### Database Operations
+```bash
+# Connect to PostgreSQL
+psql -h localhost -U auth -d authsvc
+
+# Create a new migration
+make migrate-create name=add_user_feature
+
+# Check migration status
+migrate -path migrations -database "${DB_DSN}" version
+```
 
 ## Debugging Tips
 
@@ -192,3 +304,15 @@ GitHub Actions workflow includes:
 - Use `/metrics` endpoint for Prometheus metrics
 - Grafana dashboard available at `localhost:3000` when using docker-compose
 - Enable debug logging with `LOG_LEVEL=debug`
+- All HTTP responses include request ID in `X-Request-ID` header
+- Database queries can be logged by setting `DB_LOG_QUERIES=true`
+
+## Important Notes
+
+- The project uses Go's standard library `net/http` - no web framework
+- All configuration is done through environment variables
+- Passwords are hashed using bcrypt with cost factor 12
+- Rate limiting uses token bucket algorithm (100 requests/minute by default)
+- Email sending is asynchronous using a worker pool pattern
+- All endpoints return JSON responses
+- CORS is configured to support credentials and specific origins

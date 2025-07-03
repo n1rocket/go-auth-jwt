@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/metrics"
+	"github.com/n1rocket/go-auth-jwt/internal/metrics"
 )
 
 // metricsResponseWriter wraps http.ResponseWriter to capture status code and size

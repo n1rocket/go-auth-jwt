@@ -12,7 +12,7 @@ resources:
   - hpa.yaml
 
 images:
-  - name: ghcr.io/abueno/go-auth-jwt
+  - name: ghcr.io/n1rocket/go-auth-jwt
     newTag: latest
 
 replicas:

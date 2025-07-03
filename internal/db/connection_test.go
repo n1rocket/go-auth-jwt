@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/abueno/go-auth-jwt/internal/config"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
 )
 
 func TestNew(t *testing.T) {

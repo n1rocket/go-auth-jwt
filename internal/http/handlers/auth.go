@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/abueno/go-auth-jwt/internal/http/request"
-	"github.com/abueno/go-auth-jwt/internal/http/response"
-	"github.com/abueno/go-auth-jwt/internal/service"
+	"github.com/n1rocket/go-auth-jwt/internal/http/request"
+	"github.com/n1rocket/go-auth-jwt/internal/http/response"
+	"github.com/n1rocket/go-auth-jwt/internal/service"
 )
 
 // AuthHandler handles authentication-related HTTP requests

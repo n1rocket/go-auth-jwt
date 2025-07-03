@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/http/handlers"
-	"github.com/abueno/go-auth-jwt/internal/token"
+	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
 	"github.com/golang-jwt/jwt/v5"
 )
 

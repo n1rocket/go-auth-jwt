@@ -10,7 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/http/response"
+	"github.com/n1rocket/go-auth-jwt/internal/http/response"
 )
 
 // RequestID adds a unique request ID to each request

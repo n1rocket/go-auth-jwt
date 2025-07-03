@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/config"
-	"github.com/abueno/go-auth-jwt/internal/db"
-	httpserver "github.com/abueno/go-auth-jwt/internal/http"
-	"github.com/abueno/go-auth-jwt/internal/repository/postgres"
-	"github.com/abueno/go-auth-jwt/internal/security"
-	"github.com/abueno/go-auth-jwt/internal/service"
-	"github.com/abueno/go-auth-jwt/internal/token"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
+	"github.com/n1rocket/go-auth-jwt/internal/db"
+	httpserver "github.com/n1rocket/go-auth-jwt/internal/http"
+	"github.com/n1rocket/go-auth-jwt/internal/repository/postgres"
+	"github.com/n1rocket/go-auth-jwt/internal/security"
+	"github.com/n1rocket/go-auth-jwt/internal/service"
+	"github.com/n1rocket/go-auth-jwt/internal/token"
 )
 
 // App represents the application with all its dependencies

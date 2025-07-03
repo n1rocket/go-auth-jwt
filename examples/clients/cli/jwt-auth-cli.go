@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/term"
 
-	client "github.com/abueno/go-auth-jwt/examples/clients/go"
+	client "github.com/n1rocket/go-auth-jwt/examples/clients/go"
 )
 
 const (

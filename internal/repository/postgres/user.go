@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abueno/go-auth-jwt/internal/domain"
-	"github.com/abueno/go-auth-jwt/internal/repository"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
+	"github.com/n1rocket/go-auth-jwt/internal/repository"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
