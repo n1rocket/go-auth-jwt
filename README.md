@@ -460,12 +460,86 @@ go test -bench=. -benchmem ./internal/token
 make test-all              # Runs all test types
 ```
 
+### 🐳 Automated E2E Testing with Docker
+
+The project includes comprehensive E2E testing that automatically tests all endpoints in a Docker environment:
+
+#### Quick Start E2E Testing
+
+```bash
+# Run all tests with a single command
+./scripts/run-all-tests.sh all
+
+# Or run specific test types:
+./scripts/run-all-tests.sh unit        # Unit tests only
+./scripts/run-all-tests.sh integration # Integration tests only
+./scripts/run-all-tests.sh e2e         # E2E tests only
+./scripts/run-all-tests.sh manual      # Manual endpoint tests
+```
+
+#### E2E Test Scripts Available
+
+1. **`scripts/k6/auth_flow.js`** - Basic authentication flow test
+2. **`scripts/k6/comprehensive_test.js`** - Full test suite with smoke, load, and stress scenarios
+3. **`scripts/k6/single_user_test.js`** - Single user test to avoid rate limiting
+4. **`scripts/k6/rate_limit_test.js`** - Rate limiting validation
+
+#### Running E2E Tests with Docker
+
+```bash
+# Start the test environment
+./scripts/run-all-tests.sh docker
+
+# Run E2E tests (environment must be running)
+docker run --rm -v ./scripts/k6:/scripts --network go-auth-jwt_default \
+  grafana/k6:latest run /scripts/auth_flow.js --env BASE_URL=http://api:8080
+
+# Stop the test environment
+./scripts/run-all-tests.sh stop
+```
+
+#### Manual Endpoint Testing
+
+For manual testing of individual endpoints:
+
+```bash
+# Run the manual test script
+./scripts/test-all-endpoints.sh
+```
+
+This script tests all endpoints sequentially with proper delays to avoid rate limiting.
+
+#### Tested Endpoints
+
+All endpoints are automatically tested:
+
+- ✅ `GET /health` - Health check
+- ✅ `GET /ready` - Readiness check with dependencies
+- ✅ `POST /api/v1/auth/signup` - User registration
+- ✅ `POST /api/v1/auth/login` - User authentication
+- ✅ `POST /api/v1/auth/refresh` - Token refresh
+- ✅ `POST /api/v1/auth/verify-email` - Email verification
+- ✅ `GET /api/v1/auth/me` - Get current user (protected)
+- ✅ `POST /api/v1/auth/logout` - Single device logout (protected)
+- ✅ `POST /api/v1/auth/logout-all` - All devices logout (protected)
+
+#### Test Environment URLs
+
+When running tests with Docker:
+- **API**: http://localhost:8080
+- **MailHog**: http://localhost:8025 (for email testing)
+- **PostgreSQL**: localhost:5432
+
 ### Test Structure
 
 ```
 ├── Unit Tests           # Fast, isolated tests with mocks
 ├── Integration Tests    # Tests with real database (dockertest)
 ├── E2E Tests           # Full user flow tests (k6)
+│   ├── auth_flow.js    # Basic authentication flow
+│   ├── comprehensive_test.js # Complete test scenarios
+│   ├── single_user_test.js   # Rate limit friendly test
+│   └── rate_limit_test.js    # Rate limiting validation
 └── Benchmarks          # Performance measurements
 ```
 
@@ -483,6 +557,8 @@ make test-all              # Runs all test types
 - Dockertest for integration tests
 - Mocks generated with mockery
 - Race condition detection in CI
+- k6 for load and performance testing
+- Automated E2E testing with Docker
 
 ## 🚀 Deployment
 

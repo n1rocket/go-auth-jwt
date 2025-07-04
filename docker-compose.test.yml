@@ -1,0 +1,107 @@
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: authsvc_test
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth -d authsvc_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # Run migrations
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: ["/migrate", "-path", "/migrations", "-database", "postgres://auth:testpassword@postgres:5432/authsvc_test?sslmode=disable", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    networks:
+      - test-network
+
+  # API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Application settings
+      APP_PORT: "8080"
+      APP_ENV: "test"
+      APP_READ_TIMEOUT: "15s"
+      APP_WRITE_TIMEOUT: "15s"
+      APP_IDLE_TIMEOUT: "60s"
+      APP_SHUTDOWN_TIMEOUT: "30s"
+      
+      # Database settings
+      DB_DSN: "postgres://auth:testpassword@postgres:5432/authsvc_test?sslmode=disable"
+      DB_MAX_OPEN_CONNS: "25"
+      DB_MAX_IDLE_CONNS: "5"
+      
+      # JWT settings
+      JWT_SECRET: "test_secret_key_for_e2e_testing"
+      JWT_ACCESS_TOKEN_TTL: "15m"
+      JWT_REFRESH_TOKEN_TTL: "7d"
+      JWT_ISSUER: "go-auth-jwt-test"
+      JWT_ALGORITHM: "HS256"
+      
+      # Email settings (using MailHog)
+      SMTP_HOST: "mailhog"
+      SMTP_PORT: "1025"
+      SMTP_USER: "test@example.com"
+      SMTP_PASS: "testpass"
+      EMAIL_FROM: "noreply@test.com"
+      
+      # Logging
+      LOG_LEVEL: "info"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailhog:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - test-network
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - test-network
+
+  # k6 test runner
+  k6:
+    image: grafana/k6:latest
+    command: ["run", "/scripts/auth_flow.js", "--env", "BASE_URL=http://api:8080"]
+    volumes:
+      - ./scripts/k6:/scripts:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
