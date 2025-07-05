@@ -16,9 +16,9 @@ import (
 // ExporterConfig holds exporter configuration
 type ExporterConfig struct {
 	// Export targets
-	Stdout     bool
-	File       string
-	HTTPPush   string
+	Stdout      bool
+	File        string
+	HTTPPush    string
 	PushGateway string
 
 	// Export settings
@@ -42,12 +42,12 @@ type Exporter struct {
 
 // MetricSnapshot represents a point-in-time metric value
 type MetricSnapshot struct {
-	Name      string                 `json:"name"`
-	Type      string                 `json:"type"`
-	Value     interface{}            `json:"value"`
-	Labels    map[string]string      `json:"labels"`
-	Timestamp int64                  `json:"timestamp"`
-	Hostname  string                 `json:"hostname"`
+	Name      string            `json:"name"`
+	Type      string            `json:"type"`
+	Value     interface{}       `json:"value"`
+	Labels    map[string]string `json:"labels"`
+	Timestamp int64             `json:"timestamp"`
+	Hostname  string            `json:"hostname"`
 }
 
 // NewExporter creates a new metrics exporter
@@ -122,7 +122,7 @@ func (e *Exporter) collectMetrics(hostname string) {
 		{
 			Name:      "http_requests_total",
 			Type:      "counter",
-			Value:     e.metrics.RequestsTotal.Value(),
+			Value:     e.metrics.RequestsTotal().Value(),
 			Labels:    e.config.GlobalLabels,
 			Timestamp: timestamp,
 			Hostname:  hostname,
@@ -130,7 +130,7 @@ func (e *Exporter) collectMetrics(hostname string) {
 		{
 			Name:      "http_requests_in_flight",
 			Type:      "gauge",
-			Value:     e.metrics.RequestsInFlight.Value(),
+			Value:     e.metrics.RequestsInFlight().Value(),
 			Labels:    e.config.GlobalLabels,
 			Timestamp: timestamp,
 			Hostname:  hostname,
@@ -139,7 +139,7 @@ func (e *Exporter) collectMetrics(hostname string) {
 		{
 			Name:      "auth_active_sessions",
 			Type:      "gauge",
-			Value:     e.metrics.ActiveSessions.Value(),
+			Value:     e.metrics.ActiveSessions().Value(),
 			Labels:    e.config.GlobalLabels,
 			Timestamp: timestamp,
 			Hostname:  hostname,
@@ -147,7 +147,7 @@ func (e *Exporter) collectMetrics(hostname string) {
 		{
 			Name:      "auth_login_success_total",
 			Type:      "counter",
-			Value:     e.metrics.LoginSuccess.Value(),
+			Value:     e.metrics.LoginSuccess().Value(),
 			Labels:    e.config.GlobalLabels,
 			Timestamp: timestamp,
 			Hostname:  hostname,
@@ -155,7 +155,7 @@ func (e *Exporter) collectMetrics(hostname string) {
 		{
 			Name:      "auth_login_failure_total",
 			Type:      "counter",
-			Value:     e.metrics.LoginFailure.Value(),
+			Value:     e.metrics.LoginFailure().Value(),
 			Labels:    e.config.GlobalLabels,
 			Timestamp: timestamp,
 			Hostname:  hostname,
@@ -164,7 +164,7 @@ func (e *Exporter) collectMetrics(hostname string) {
 		{
 			Name:      "go_goroutines",
 			Type:      "gauge",
-			Value:     e.metrics.GoRoutines.Value(),
+			Value:     e.metrics.GoRoutines().Value(),
 			Labels:    e.config.GlobalLabels,
 			Timestamp: timestamp,
 			Hostname:  hostname,
@@ -172,7 +172,7 @@ func (e *Exporter) collectMetrics(hostname string) {
 		{
 			Name:      "go_memory_allocated_bytes",
 			Type:      "gauge",
-			Value:     e.metrics.MemoryAllocated.Value(),
+			Value:     e.metrics.MemoryAllocated().Value(),
 			Labels:    e.config.GlobalLabels,
 			Timestamp: timestamp,
 			Hostname:  hostname,
@@ -274,7 +274,7 @@ func (e *Exporter) sendHTTPBatch(client *http.Client, batch []MetricSnapshot) {
 		return
 	}
 
-	resp, err := client.Post(e.config.HTTPPush, "application/json", 
+	resp, err := client.Post(e.config.HTTPPush, "application/json",
 		bytes.NewReader(data))
 	if err != nil {
 		e.logger.Error("Failed to push metrics",

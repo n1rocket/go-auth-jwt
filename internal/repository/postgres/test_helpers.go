@@ -102,7 +102,7 @@ func AssertRowCount(t *testing.T, db *sql.DB, table string, expected int) {
 
 	var count int
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
-	
+
 	err := db.QueryRow(query).Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to count rows in %s: %v", table, err)

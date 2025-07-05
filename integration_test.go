@@ -440,7 +440,7 @@ func TestIntegration_EmailVerificationFlow(t *testing.T) {
 		verifyReq := map[string]string{
 			"token": "test-verification-token",
 		}
-		
+
 		resp = makeIntegrationRequest(t, ts.server, "POST", "/api/v1/auth/verify-email", verifyReq, nil)
 		// Verification might fail with test token, but that's OK for this test
 	}
@@ -456,7 +456,7 @@ func TestIntegration_TokenExpiration(t *testing.T) {
 
 	// This test is simplified since we can't easily create custom tokens
 	// with different expiration times without access to internal services
-	
+
 	// Create and login a user
 	signupReq := map[string]string{
 		"email":    "expiry@example.com",

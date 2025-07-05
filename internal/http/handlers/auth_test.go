@@ -94,14 +94,14 @@ func (m *mockUserRepository) ExistsByEmail(ctx context.Context, email string) (b
 }
 
 type mockRefreshTokenRepository struct {
-	createFunc            func(ctx context.Context, token *domain.RefreshToken) error
-	getByTokenFunc        func(ctx context.Context, token string) (*domain.RefreshToken, error)
-	getByUserIDFunc       func(ctx context.Context, userID string) ([]*domain.RefreshToken, error)
-	updateFunc            func(ctx context.Context, token *domain.RefreshToken) error
-	revokeFunc            func(ctx context.Context, token string) error
-	revokeAllForUserFunc  func(ctx context.Context, userID string) error
-	deleteExpiredFunc     func(ctx context.Context) error
-	deleteByTokenFunc     func(ctx context.Context, token string) error
+	createFunc           func(ctx context.Context, token *domain.RefreshToken) error
+	getByTokenFunc       func(ctx context.Context, token string) (*domain.RefreshToken, error)
+	getByUserIDFunc      func(ctx context.Context, userID string) ([]*domain.RefreshToken, error)
+	updateFunc           func(ctx context.Context, token *domain.RefreshToken) error
+	revokeFunc           func(ctx context.Context, token string) error
+	revokeAllForUserFunc func(ctx context.Context, userID string) error
+	deleteExpiredFunc    func(ctx context.Context) error
+	deleteByTokenFunc    func(ctx context.Context, token string) error
 }
 
 func (m *mockRefreshTokenRepository) Create(ctx context.Context, token *domain.RefreshToken) error {
@@ -173,10 +173,10 @@ func createTestAuthService(userRepo repository.UserRepository, refreshRepo repos
 	if refreshRepo == nil {
 		refreshRepo = &mockRefreshTokenRepository{}
 	}
-	
+
 	passwordHasher := security.NewPasswordHasher(10)
 	tokenManager, _ := token.NewManager("HS256", "test-secret", "", "", "test-issuer", 3600*time.Second)
-	
+
 	return service.NewAuthService(userRepo, refreshRepo, passwordHasher, tokenManager, 24*time.Hour)
 }
 
@@ -256,20 +256,20 @@ func TestAuthHandler_Signup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			authService := createTestAuthService(tt.userRepo, nil)
 			h := NewAuthHandler(authService)
-			
+
 			var body []byte
 			if s, ok := tt.requestBody.(string); ok {
 				body = []byte(s)
 			} else {
 				body, _ = json.Marshal(tt.requestBody)
 			}
-			
+
 			req := httptest.NewRequest("POST", "/auth/signup", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
-			
+
 			h.Signup(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
@@ -281,7 +281,7 @@ func TestAuthHandler_Login(t *testing.T) {
 	// Create a valid password hash for testing
 	passwordHasher := security.NewPasswordHasher(10)
 	validHash, _ := passwordHasher.Hash("Password123!")
-	
+
 	tests := []struct {
 		name           string
 		requestBody    interface{}
@@ -392,29 +392,29 @@ func TestAuthHandler_Login(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			authService := createTestAuthService(tt.userRepo, nil)
 			h := NewAuthHandler(authService)
-			
+
 			var body []byte
 			if s, ok := tt.requestBody.(string); ok {
 				body = []byte(s)
 			} else {
 				body, _ = json.Marshal(tt.requestBody)
 			}
-			
+
 			req := httptest.NewRequest("POST", "/auth/login", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
-			
+
 			for k, v := range tt.requestHeaders {
 				req.Header.Set(k, v)
 			}
-			
+
 			w := httptest.NewRecorder()
-			
+
 			h.Login(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
-			
+
 			if tt.checkCookie && w.Code == http.StatusOK {
 				cookies := w.Result().Cookies()
 				found := false
@@ -437,11 +437,11 @@ func TestAuthHandler_Login(t *testing.T) {
 
 func TestAuthHandler_Refresh(t *testing.T) {
 	tests := []struct {
-		name               string
-		refreshToken       string
-		cookie             bool
-		refreshTokenRepo   *mockRefreshTokenRepository
-		expectedStatus     int
+		name             string
+		refreshToken     string
+		cookie           bool
+		refreshTokenRepo *mockRefreshTokenRepository
+		expectedStatus   int
 	}{
 		{
 			name:         "successful refresh with header",
@@ -534,7 +534,7 @@ func TestAuthHandler_Refresh(t *testing.T) {
 			}
 			authService := createTestAuthService(userRepo, tt.refreshTokenRepo)
 			h := NewAuthHandler(authService)
-			
+
 			// Create request body with refresh token
 			var body io.Reader
 			if tt.refreshToken != "" {
@@ -544,16 +544,16 @@ func TestAuthHandler_Refresh(t *testing.T) {
 				jsonBody, _ := json.Marshal(reqBody)
 				body = bytes.NewReader(jsonBody)
 			}
-			
+
 			req := httptest.NewRequest("POST", "/auth/refresh", body)
 			if body != nil {
 				req.Header.Set("Content-Type", "application/json")
 			}
-			
+
 			w := httptest.NewRecorder()
-			
+
 			h.Refresh(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
@@ -586,7 +586,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			authService := createTestAuthService(nil, nil)
 			h := NewAuthHandler(authService)
-			
+
 			// Create request body with refresh token
 			var body io.Reader
 			if tt.refreshToken != "" {
@@ -596,7 +596,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 				jsonBody, _ := json.Marshal(reqBody)
 				body = bytes.NewReader(jsonBody)
 			}
-			
+
 			req := httptest.NewRequest("POST", "/auth/logout", body)
 			if body != nil {
 				req.Header.Set("Content-Type", "application/json")
@@ -605,11 +605,11 @@ func TestAuthHandler_Logout(t *testing.T) {
 				ctx := context.WithValue(req.Context(), "user_id", tt.userID)
 				req = req.WithContext(ctx)
 			}
-			
+
 			w := httptest.NewRecorder()
-			
+
 			h.Logout(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
@@ -620,10 +620,10 @@ func TestAuthHandler_Logout(t *testing.T) {
 func TestAuthHandler_LogoutAll(t *testing.T) {
 	t.Skip("Skipping test - auth handler implementation is missing")
 	tests := []struct {
-		name               string
-		userID             string
-		refreshTokenRepo   *mockRefreshTokenRepository
-		expectedStatus     int
+		name             string
+		userID           string
+		refreshTokenRepo *mockRefreshTokenRepository
+		expectedStatus   int
 	}{
 		{
 			name:           "successful logout all",
@@ -663,7 +663,7 @@ func TestAuthHandler_LogoutAll(t *testing.T) {
 			}
 			authService := createTestAuthService(userRepo, tt.refreshTokenRepo)
 			h := NewAuthHandler(authService)
-			
+
 			req := httptest.NewRequest("POST", "/auth/logout-all", nil)
 			if tt.userID != "" {
 				// Use the same context key as the handler
@@ -671,11 +671,11 @@ func TestAuthHandler_LogoutAll(t *testing.T) {
 				ctx := context.WithValue(req.Context(), contextKey("userID"), tt.userID)
 				req = req.WithContext(ctx)
 			}
-			
+
 			w := httptest.NewRecorder()
-			
+
 			h.LogoutAll(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
@@ -699,13 +699,13 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 			userRepo: &mockUserRepository{
 				getByEmailFunc: func(ctx context.Context, email string) (*domain.User, error) {
 					user := &domain.User{
-						ID:                          "user-123",
-						Email:                       email,
-						EmailVerified:               false,
-						EmailVerificationToken:      stringPtr("verification-token"),
-						EmailVerificationExpiresAt:  timePtr(time.Now().Add(1 * time.Hour)),
-						CreatedAt:                   time.Now(),
-						UpdatedAt:                   time.Now(),
+						ID:                         "user-123",
+						Email:                      email,
+						EmailVerified:              false,
+						EmailVerificationToken:     stringPtr("verification-token"),
+						EmailVerificationExpiresAt: timePtr(time.Now().Add(1 * time.Hour)),
+						CreatedAt:                  time.Now(),
+						UpdatedAt:                  time.Now(),
 					}
 					return user, nil
 				},
@@ -746,13 +746,13 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 			userRepo: &mockUserRepository{
 				getByEmailFunc: func(ctx context.Context, email string) (*domain.User, error) {
 					user := &domain.User{
-						ID:                          "user-123",
-						Email:                       email,
-						EmailVerified:               false,
-						EmailVerificationToken:      stringPtr("verification-token"),
-						EmailVerificationExpiresAt:  timePtr(time.Now().Add(1 * time.Hour)),
-						CreatedAt:                   time.Now(),
-						UpdatedAt:                   time.Now(),
+						ID:                         "user-123",
+						Email:                      email,
+						EmailVerified:              false,
+						EmailVerificationToken:     stringPtr("verification-token"),
+						EmailVerificationExpiresAt: timePtr(time.Now().Add(1 * time.Hour)),
+						CreatedAt:                  time.Now(),
+						UpdatedAt:                  time.Now(),
 					}
 					return user, nil
 				},
@@ -768,13 +768,13 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 			userRepo: &mockUserRepository{
 				getByEmailFunc: func(ctx context.Context, email string) (*domain.User, error) {
 					user := &domain.User{
-						ID:                          "user-123",
-						Email:                       email,
-						EmailVerified:               false,
-						EmailVerificationToken:      stringPtr("verification-token"),
-						EmailVerificationExpiresAt:  timePtr(time.Now().Add(-1 * time.Hour)), // Expired
-						CreatedAt:                   time.Now(),
-						UpdatedAt:                   time.Now(),
+						ID:                         "user-123",
+						Email:                      email,
+						EmailVerified:              false,
+						EmailVerificationToken:     stringPtr("verification-token"),
+						EmailVerificationExpiresAt: timePtr(time.Now().Add(-1 * time.Hour)), // Expired
+						CreatedAt:                  time.Now(),
+						UpdatedAt:                  time.Now(),
 					}
 					return user, nil
 				},
@@ -787,21 +787,21 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			authService := createTestAuthService(tt.userRepo, nil)
 			h := NewAuthHandler(authService)
-			
+
 			var body []byte
 			if s, ok := tt.requestBody.(string); ok {
 				body = []byte(s)
 			} else {
 				body, _ = json.Marshal(tt.requestBody)
 			}
-			
+
 			req := httptest.NewRequest("POST", "/auth/verify-email", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
-			
+
 			w := httptest.NewRecorder()
-			
+
 			h.VerifyEmail(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
@@ -853,7 +853,7 @@ func TestAuthHandler_GetCurrentUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			authService := createTestAuthService(tt.userRepo, nil)
 			h := NewAuthHandler(authService)
-			
+
 			req := httptest.NewRequest("GET", "/auth/me", nil)
 			if tt.userID != "" {
 				// Use the same context key as the handler
@@ -861,11 +861,11 @@ func TestAuthHandler_GetCurrentUser(t *testing.T) {
 				ctx := context.WithValue(req.Context(), contextKey("userID"), tt.userID)
 				req = req.WithContext(ctx)
 			}
-			
+
 			w := httptest.NewRecorder()
-			
+
 			h.GetCurrentUser(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
@@ -939,11 +939,11 @@ func TestGetClientIP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.RemoteAddr = tt.remoteAddr
-			
+
 			for k, v := range tt.headers {
 				req.Header.Set(k, v)
 			}
-			
+
 			ip := getClientIP(req)
 			if ip != tt.expectedIP {
 				t.Errorf("Expected IP %q, got %q", tt.expectedIP, ip)
@@ -951,4 +951,3 @@ func TestGetClientIP(t *testing.T) {
 		})
 	}
 }
-

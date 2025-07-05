@@ -109,11 +109,11 @@ func (m *Monitor) Start(ctx context.Context) error {
 
 	// Start server
 	go func() {
-		m.logger.Info("Starting monitoring server", 
+		m.logger.Info("Starting monitoring server",
 			slog.String("address", m.server.Addr),
 			slog.String("metrics_path", m.config.MetricsPath),
 		)
-		
+
 		if err := m.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			m.logger.Error("Monitoring server error", slog.String("error", err.Error()))
 		}
@@ -134,7 +134,7 @@ func (m *Monitor) Stop() error {
 	defer cancel()
 
 	m.metrics.Stop()
-	
+
 	if err := m.server.Shutdown(ctx); err != nil {
 		return fmt.Errorf("monitoring server shutdown failed: %w", err)
 	}
@@ -158,7 +158,7 @@ func (m *Monitor) healthHandler(w http.ResponseWriter, r *http.Request) {
 // readyHandler handles readiness check requests
 func (m *Monitor) readyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	if !m.ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, `{"status":"not_ready","timestamp":%d}`, time.Now().Unix())
@@ -168,7 +168,7 @@ func (m *Monitor) readyHandler(w http.ResponseWriter, r *http.Request) {
 	// Check various subsystems
 	checks := m.performReadinessChecks()
 	allHealthy := true
-	
+
 	for _, check := range checks {
 		if !check.Healthy {
 			allHealthy = false
@@ -178,11 +178,11 @@ func (m *Monitor) readyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if allHealthy {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"ready","checks":%s,"timestamp":%d}`, 
+		fmt.Fprintf(w, `{"status":"ready","checks":%s,"timestamp":%d}`,
 			checksToJSON(checks), time.Now().Unix())
 	} else {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, `{"status":"not_ready","checks":%s,"timestamp":%d}`, 
+		fmt.Fprintf(w, `{"status":"not_ready","checks":%s,"timestamp":%d}`,
 			checksToJSON(checks), time.Now().Unix())
 	}
 }
@@ -207,7 +207,7 @@ func (m *Monitor) performReadinessChecks() []ReadinessCheck {
 	}
 
 	// Add more checks as needed (database, cache, etc.)
-	
+
 	return checks
 }
 
@@ -256,7 +256,7 @@ func NewCollector(m *metrics.Metrics, logger *slog.Logger) *Collector {
 // RecordHTTPRequest records an HTTP request
 func (c *Collector) RecordHTTPRequest(method, path, status string, duration time.Duration, size int) {
 	c.metrics.RecordHTTPRequest(method, path, status, duration, size)
-	
+
 	// Log slow requests
 	if duration > 1*time.Second {
 		c.logger.Warn("Slow HTTP request",
@@ -271,7 +271,7 @@ func (c *Collector) RecordHTTPRequest(method, path, status string, duration time
 // RecordDBQuery records a database query
 func (c *Collector) RecordDBQuery(operation string, duration time.Duration, err error) {
 	c.metrics.RecordDBQuery(operation, duration, err)
-	
+
 	// Log slow queries
 	if duration > 100*time.Millisecond {
 		c.logger.Warn("Slow database query",
@@ -279,7 +279,7 @@ func (c *Collector) RecordDBQuery(operation string, duration time.Duration, err 
 			slog.Duration("duration", duration),
 		)
 	}
-	
+
 	// Log errors
 	if err != nil {
 		c.logger.Error("Database query error",

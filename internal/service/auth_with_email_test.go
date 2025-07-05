@@ -110,7 +110,7 @@ func (m *mockUserRepositoryWithEmail) ExistsByEmail(ctx context.Context, email s
 
 // Mock refresh token repository
 type mockRefreshTokenRepositoryWithEmail struct {
-	tokens map[string]*domain.RefreshToken
+	tokens  map[string]*domain.RefreshToken
 	counter int
 }
 
@@ -200,18 +200,18 @@ func createTestAuthServiceWithEmail(
 	if emailSvc == nil {
 		emailSvc = &mockEmailService{}
 	}
-	
+
 	passwordHasher := security.NewPasswordHasher(10)
 	tokenManager, _ := token.NewManager("HS256", "test-secret", "", "", "test-issuer", 3600*time.Second)
-	
+
 	authService := NewAuthService(userRepo, refreshRepo, passwordHasher, tokenManager, 24*time.Hour)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	cfg := createTestConfig()
-	
+
 	// Create a real EmailDispatcher with mock email service
 	dispatcherConfig := worker.DefaultConfig()
 	dispatcher := worker.NewEmailDispatcher(emailSvc, dispatcherConfig, logger)
-	
+
 	return NewAuthServiceWithEmail(authService, dispatcher, cfg, logger)
 }
 
@@ -227,14 +227,14 @@ func createTestAuthServiceWithMockDispatcher(
 	if refreshRepo == nil {
 		refreshRepo = newMockRefreshTokenRepositoryWithEmail()
 	}
-	
+
 	passwordHasher := security.NewPasswordHasher(10)
 	tokenManager, _ := token.NewManager("HS256", "test-secret", "", "", "test-issuer", 3600*time.Second)
-	
+
 	authService := NewAuthService(userRepo, refreshRepo, passwordHasher, tokenManager, 24*time.Hour)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	cfg := createTestConfig()
-	
+
 	return &AuthServiceWithEmail{
 		AuthService:     authService,
 		emailDispatcher: dispatcher.EmailDispatcher,
@@ -250,9 +250,9 @@ func TestNewAuthServiceWithEmail(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	dispatcherConfig := worker.DefaultConfig()
 	dispatcher := worker.NewEmailDispatcher(emailService, dispatcherConfig, logger)
-	
+
 	service := NewAuthServiceWithEmail(authService, dispatcher, cfg, logger)
-	
+
 	if service.AuthService != authService {
 		t.Error("Expected AuthService to be set")
 	}
@@ -320,30 +320,30 @@ func TestAuthServiceWithEmail_SignupWithEmail(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := createTestAuthServiceWithEmail(tt.userRepo, nil, tt.emailService)
-			
+
 			output, err := service.SignupWithEmail(context.Background(), tt.input)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if output == nil {
 				t.Error("Expected output but got nil")
 				return
 			}
-			
+
 			if output.UserID == "" {
 				t.Error("Expected UserID to be set")
 			}
-			
+
 			if output.EmailVerificationToken == "" {
 				t.Error("Expected EmailVerificationToken to be set")
 			}
@@ -353,10 +353,10 @@ func TestAuthServiceWithEmail_SignupWithEmail(t *testing.T) {
 
 func TestAuthServiceWithEmail_ResendVerificationEmailWithNotification(t *testing.T) {
 	tests := []struct {
-		name            string
-		email           string
-		userRepo        repository.UserRepository
-		expectError     bool
+		name        string
+		email       string
+		userRepo    repository.UserRepository
+		expectError bool
 	}{
 		{
 			name:  "successful resend",
@@ -408,26 +408,26 @@ func TestAuthServiceWithEmail_ResendVerificationEmailWithNotification(t *testing
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := createTestAuthServiceWithEmail(tt.userRepo, nil, nil)
-			
+
 			output, err := service.ResendVerificationEmailWithNotification(context.Background(), tt.email)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if output == nil {
 				t.Error("Expected output but got nil")
 				return
 			}
-			
+
 			if output.EmailVerificationToken == "" {
 				t.Error("Expected EmailVerificationToken to be set")
 			}
@@ -439,13 +439,13 @@ func TestAuthServiceWithEmail_LoginWithNotification(t *testing.T) {
 	// Create a valid password hash for testing
 	passwordHasher := security.NewPasswordHasher(10)
 	validHash, _ := passwordHasher.Hash("Password123!")
-	
+
 	tests := []struct {
-		name              string
-		input             LoginInput
-		userRepo          repository.UserRepository
-		config            *config.Config
-		expectError       bool
+		name        string
+		input       LoginInput
+		userRepo    repository.UserRepository
+		config      *config.Config
+		expectError bool
 	}{
 		{
 			name: "successful login with notification",
@@ -536,38 +536,38 @@ func TestAuthServiceWithEmail_LoginWithNotification(t *testing.T) {
 			if tt.config != nil {
 				service.config = tt.config
 			}
-			
+
 			// Add timeout to avoid waiting indefinitely for goroutine
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
-			
+
 			output, err := service.LoginWithNotification(ctx, tt.input)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if output == nil {
 				t.Error("Expected output but got nil")
 				return
 			}
-			
+
 			if output.AccessToken == "" {
 				t.Error("Expected AccessToken to be set")
 			}
-			
+
 			if output.RefreshToken == "" {
 				t.Error("Expected RefreshToken to be set")
 			}
-			
+
 			// Give goroutine time to execute
 			time.Sleep(50 * time.Millisecond)
 		})

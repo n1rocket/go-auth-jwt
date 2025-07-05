@@ -26,10 +26,10 @@ func WriteError(w http.ResponseWriter, err error) {
 	// Check for JSON parsing errors first
 	if err != nil {
 		errStr := err.Error()
-		if strings.Contains(errStr, "failed to decode JSON") || 
-		   strings.Contains(errStr, "Content-Type") ||
-		   strings.Contains(errStr, "unexpected EOF") ||
-		   strings.Contains(errStr, "invalid character") {
+		if strings.Contains(errStr, "failed to decode JSON") ||
+			strings.Contains(errStr, "Content-Type") ||
+			strings.Contains(errStr, "unexpected EOF") ||
+			strings.Contains(errStr, "invalid character") {
 			statusCode = http.StatusBadRequest
 			errorResponse = ErrorResponse{
 				Error:   "bad_request",
@@ -40,7 +40,7 @@ func WriteError(w http.ResponseWriter, err error) {
 			return
 		}
 	}
-	
+
 	// Map domain errors to HTTP status codes
 	switch {
 	case errors.Is(err, domain.ErrUserNotFound):

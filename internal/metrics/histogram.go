@@ -46,7 +46,7 @@ func NewHistogramWithBuckets(name, help string, buckets []float64) *Histogram {
 	sortedBuckets := make([]float64, len(buckets))
 	copy(sortedBuckets, buckets)
 	sort.Float64s(sortedBuckets)
-	
+
 	return &Histogram{
 		name:    name,
 		help:    help,
@@ -64,15 +64,15 @@ func (h *Histogram) Observe(value float64) {
 		oldSum := math.Float64frombits(oldBits)
 		newSum := oldSum + value
 		newBits := math.Float64bits(newSum)
-		
+
 		if atomic.CompareAndSwapUint64(&h.sum, oldBits, newBits) {
 			break
 		}
 	}
-	
+
 	// Update count
 	atomic.AddUint64(&h.count, 1)
-	
+
 	// Find the appropriate bucket
 	bucketIndex := len(h.buckets)
 	for i, upper := range h.buckets {
@@ -81,7 +81,7 @@ func (h *Histogram) Observe(value float64) {
 			break
 		}
 	}
-	
+
 	// Update bucket count
 	atomic.AddUint64(&h.counts[bucketIndex], 1)
 }
@@ -89,11 +89,11 @@ func (h *Histogram) Observe(value float64) {
 // WithLabels returns a labeled histogram
 func (h *Histogram) WithLabels(labels map[string]string) *LabeledHistogram {
 	key := labelsToKey(labels)
-	
+
 	h.mu.RLock()
 	lh, exists := h.labels[key]
 	h.mu.RUnlock()
-	
+
 	if !exists {
 		h.mu.Lock()
 		lh = &labeledHistogram{
@@ -105,24 +105,24 @@ func (h *Histogram) WithLabels(labels map[string]string) *LabeledHistogram {
 		h.labels[key] = lh
 		h.mu.Unlock()
 	}
-	
+
 	return &LabeledHistogram{histogram: lh}
 }
 
 // Buckets returns the bucket upper bounds and their counts
 func (h *Histogram) Buckets() map[float64]uint64 {
 	result := make(map[float64]uint64)
-	
+
 	cumulative := uint64(0)
 	for i, bucket := range h.buckets {
 		cumulative += atomic.LoadUint64(&h.counts[i])
 		result[bucket] = cumulative
 	}
-	
+
 	// Add +Inf bucket
 	cumulative += atomic.LoadUint64(&h.counts[len(h.buckets)])
 	result[math.Inf(1)] = cumulative
-	
+
 	return result
 }
 
@@ -155,7 +155,7 @@ func (h *Histogram) Value() interface{} {
 			"count": count,
 		})
 	}
-	
+
 	return map[string]interface{}{
 		"buckets": bucketList,
 		"sum":     h.Sum(),
@@ -178,15 +178,15 @@ func (h *Histogram) Percentile(p float64) float64 {
 	if p < 0 || p > 100 {
 		panic("percentile must be between 0 and 100")
 	}
-	
+
 	count := h.Count()
 	if count == 0 {
 		return 0
 	}
-	
+
 	threshold := uint64(float64(count) * p / 100.0)
 	cumulative := uint64(0)
-	
+
 	for i, bucketCount := range h.counts[:len(h.counts)-1] {
 		cumulative += atomic.LoadUint64(&bucketCount)
 		if cumulative >= threshold {
@@ -201,7 +201,7 @@ func (h *Histogram) Percentile(p float64) float64 {
 			return prevBucket + (h.buckets[i]-prevBucket)/2
 		}
 	}
-	
+
 	// Value is in the +Inf bucket
 	if len(h.buckets) > 0 {
 		return h.buckets[len(h.buckets)-1] * 2
@@ -213,11 +213,11 @@ func (h *Histogram) Percentile(p float64) float64 {
 func (h *Histogram) Reset() {
 	atomic.StoreUint64(&h.sum, 0)
 	atomic.StoreUint64(&h.count, 0)
-	
+
 	for i := range h.counts {
 		atomic.StoreUint64(&h.counts[i], 0)
 	}
-	
+
 	h.mu.Lock()
 	h.labels = make(map[string]*labeledHistogram)
 	h.mu.Unlock()
@@ -232,15 +232,15 @@ type LabeledHistogram struct {
 func (lh *LabeledHistogram) Observe(value float64) {
 	lh.histogram.mu.Lock()
 	defer lh.histogram.mu.Unlock()
-	
+
 	// Update sum
 	oldSum := math.Float64frombits(lh.histogram.sum)
 	newSum := oldSum + value
 	lh.histogram.sum = math.Float64bits(newSum)
-	
+
 	// Update count
 	lh.histogram.count++
-	
+
 	// Find the appropriate bucket
 	bucketIndex := len(lh.histogram.buckets)
 	for i, upper := range lh.histogram.buckets {
@@ -249,7 +249,7 @@ func (lh *LabeledHistogram) Observe(value float64) {
 			break
 		}
 	}
-	
+
 	// Update bucket count
 	lh.histogram.counts[bucketIndex]++
 }

@@ -55,7 +55,7 @@ func main() {
 	userRepo := postgres.NewUserRepository(dbPool)
 	refreshTokenRepo := postgres.NewRefreshTokenRepository(dbPool)
 	passwordHasher := security.NewDefaultPasswordHasher()
-	
+
 	tokenManager, err := token.NewManager(
 		cfg.JWT.Algorithm,
 		cfg.JWT.Secret,
@@ -89,7 +89,7 @@ func main() {
 	// Start server in a goroutine
 	serverErrors := make(chan error, 1)
 	go func() {
-		slog.Info("starting HTTP server", 
+		slog.Info("starting HTTP server",
 			"port", cfg.App.Port,
 			"environment", cfg.App.Environment,
 		)

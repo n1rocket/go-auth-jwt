@@ -14,16 +14,16 @@ import (
 
 func TestSignupRequest_Validation(t *testing.T) {
 	tests := []struct {
-		name           string
-		requestBody    string
-		expectedStatus int
+		name             string
+		requestBody      string
+		expectedStatus   int
 		skipValidRequest bool
 	}{
 		{
-			name:           "valid request",
-			requestBody:    `{"email":"test@example.com","password":"password123"}`,
-			expectedStatus: http.StatusInternalServerError, // Will fail at service level
-			skipValidRequest: true, // Skip this test since it requires a service
+			name:             "valid request",
+			requestBody:      `{"email":"test@example.com","password":"password123"}`,
+			expectedStatus:   http.StatusInternalServerError, // Will fail at service level
+			skipValidRequest: true,                           // Skip this test since it requires a service
 		},
 		{
 			name:           "missing email",
@@ -67,7 +67,7 @@ func TestSignupRequest_Validation(t *testing.T) {
 			if tt.skipValidRequest {
 				t.Skip("Skipping test that requires service implementation")
 			}
-			
+
 			// Create request
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/signup", bytes.NewBufferString(tt.requestBody))
 			req.Header.Set("Content-Type", "application/json")
@@ -332,14 +332,14 @@ func TestGetClientIP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			req.RemoteAddr = tt.remoteAddr
-			
+
 			if tt.xForwardedFor != "" {
 				req.Header.Set("X-Forwarded-For", tt.xForwardedFor)
 			}
 			if tt.xRealIP != "" {
 				req.Header.Set("X-Real-IP", tt.xRealIP)
 			}
-			
+
 			got := tt.testFunc(req)
 			if got != tt.expectedIP {
 				t.Errorf("Expected IP %s, got %s", tt.expectedIP, got)
@@ -351,15 +351,15 @@ func TestGetClientIP(t *testing.T) {
 func TestWithUserID(t *testing.T) {
 	ctx := context.Background()
 	userID := "test-user-123"
-	
+
 	// Test WithUserID
 	ctxWithUser := handlers.WithUserID(ctx, userID)
-	
+
 	// Test retrieving user ID
 	if val := ctxWithUser.Value(handlers.UserIDContextKey); val != userID {
 		t.Errorf("Expected user ID %s, got %v", userID, val)
 	}
-	
+
 	// Test missing user ID
 	if val := ctx.Value(handlers.UserIDContextKey); val != nil {
 		t.Errorf("Expected nil user ID, got %v", val)

@@ -244,12 +244,12 @@ func TestMetricsCollectorMethods(t *testing.T) {
 
 func TestMetricsMiddlewareIntegration(t *testing.T) {
 	metricsInstance := metrics.NewMetrics()
-	
+
 	// Create a handler that simulates different response times
 	handler := Metrics(metricsInstance)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulate some processing time
 		time.Sleep(10 * time.Millisecond)
-		
+
 		if strings.Contains(r.URL.Path, "error") {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("error"))
@@ -274,7 +274,7 @@ func TestMetricsMiddlewareIntegration(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, p.path, nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
-		
+
 		if rec.Code != p.status {
 			t.Errorf("Path %s: expected status %d, got %d", p.path, p.status, rec.Code)
 		}

@@ -25,9 +25,9 @@ type RateLimiter struct {
 
 // TokenBucket represents a token bucket for rate limiting
 type TokenBucket struct {
-	tokens    float64
-	lastFill  time.Time
-	mu        sync.Mutex
+	tokens   float64
+	lastFill time.Time
+	mu       sync.Mutex
 }
 
 // KeyFunc extracts a key from the request for rate limiting
@@ -60,10 +60,10 @@ func PathKeyFunc() KeyFunc {
 
 // RateLimitConfig holds rate limiter configuration
 type RateLimitConfig struct {
-	Rate     int           // tokens per window
-	Burst    int           // max burst size
-	Window   time.Duration // time window
-	KeyFunc  KeyFunc       // key extraction function
+	Rate     int                        // tokens per window
+	Burst    int                        // max burst size
+	Window   time.Duration              // time window
+	KeyFunc  KeyFunc                    // key extraction function
 	SkipFunc func(r *http.Request) bool // skip rate limiting for certain requests
 }
 
@@ -125,10 +125,10 @@ func RateLimit(config RateLimitConfig, logger *slog.Logger) func(http.Handler) h
 			if !allowed {
 				// Rate limit exceeded
 				w.Header().Set("Retry-After", strconv.Itoa(int(time.Until(resetTime).Seconds())))
-				
+
 				response.WriteJSON(w, http.StatusTooManyRequests, map[string]interface{}{
-					"error":   "rate_limit_exceeded",
-					"message": "Too many requests. Please try again later.",
+					"error":       "rate_limit_exceeded",
+					"message":     "Too many requests. Please try again later.",
 					"retry_after": int(time.Until(resetTime).Seconds()),
 				})
 				return
@@ -159,7 +159,7 @@ func (rl *RateLimiter) Allow(key string) (allowed bool, remaining int, resetTime
 	now := time.Now()
 	elapsed := now.Sub(bucket.lastFill)
 	tokensToAdd := elapsed.Seconds() * float64(rl.rate) / rl.window.Seconds()
-	
+
 	bucket.tokens = min(bucket.tokens+tokensToAdd, float64(rl.burst))
 	bucket.lastFill = now
 
@@ -236,7 +236,7 @@ func getClientIP(r *http.Request) string {
 		}
 		return addr
 	}
-	
+
 	return r.RemoteAddr
 }
 

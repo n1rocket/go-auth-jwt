@@ -17,7 +17,7 @@ func TestNewApp(t *testing.T) {
 		name    string
 		config  *config.Config
 		wantErr bool
-		errMsg string
+		errMsg  string
 	}{
 		{
 			name: "invalid database connection",
@@ -79,21 +79,28 @@ func TestMainFunction(t *testing.T) {
 	if os.Getenv("CI") == "true" {
 		t.Skip("Skipping main function test in CI")
 	}
-	
+
 	// Save original args and environment
 	origArgs := os.Args
 	origEnv := os.Environ()
-	
+
 	// Set minimal environment to make it fail fast
 	os.Clearenv()
 	os.Setenv("DATABASE_URL", "")
-	
+	os.Setenv("JWT_SECRET", "test-secret")
+	os.Setenv("DB_DSN", "postgres://test:test@invalid:5432/test?sslmode=disable")
+	os.Setenv("EMAIL_ENABLED", "false")
+	os.Setenv("SMTP_HOST", "localhost")
+	os.Setenv("SMTP_PORT", "1025")
+	os.Setenv("SMTP_USER", "test")
+	os.Setenv("SMTP_PASS", "test")
+
 	// Capture exit
 	oldExit := osExit
 	osExit = func(code int) {
 		panic("os.Exit called")
 	}
-	
+
 	defer func() {
 		// Restore
 		osExit = oldExit
@@ -106,10 +113,10 @@ func TestMainFunction(t *testing.T) {
 		}
 		recover() // Recover from panic
 	}()
-	
+
 	// Run main - it should exit
 	main()
-	
+
 	// Should not reach here
 	t.Error("Expected main to exit")
 }

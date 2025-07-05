@@ -20,16 +20,16 @@ func min(a, b int) int {
 
 func TestNewDashboard(t *testing.T) {
 	tests := []struct {
-		name                string
-		config              DashboardConfig
-		expectedRefresh     time.Duration
-		expectedTheme       string
+		name            string
+		config          DashboardConfig
+		expectedRefresh time.Duration
+		expectedTheme   string
 	}{
 		{
-			name:                "default values",
-			config:              DashboardConfig{Enabled: true, Path: "/dashboard"},
-			expectedRefresh:     5 * time.Second,
-			expectedTheme:       "light",
+			name:            "default values",
+			config:          DashboardConfig{Enabled: true, Path: "/dashboard"},
+			expectedRefresh: 5 * time.Second,
+			expectedTheme:   "light",
 		},
 		{
 			name: "custom values",
@@ -76,10 +76,10 @@ func TestDashboard_Handler(t *testing.T) {
 	dashboard := NewDashboard(config, m)
 
 	tests := []struct {
-		name        string
-		path        string
-		wantAPI     bool
-		wantStatus  int
+		name       string
+		path       string
+		wantAPI    bool
+		wantStatus int
 	}{
 		{
 			name:       "dashboard HTML",
@@ -169,7 +169,7 @@ func TestDashboard_ServeDashboard(t *testing.T) {
 	}
 
 	body := rr.Body.String()
-	
+
 	// Check that template variables are properly rendered
 	if !strings.Contains(body, "JWT Auth Service - Metrics Dashboard") {
 		t.Error("Expected title in rendered HTML")
@@ -186,7 +186,7 @@ func TestDashboard_ServeDashboard(t *testing.T) {
 			t.Error("Expected refresh interval in JavaScript not found")
 		}
 	}
-	
+
 	// Check metrics endpoint - the template escapes slashes as \/
 	if !strings.Contains(body, "\\/dashboard\\/api\\/metrics") && !strings.Contains(body, "/dashboard/api/metrics") {
 		idx := strings.Index(body, "const metricsEndpoint")
@@ -204,13 +204,13 @@ func TestDashboard_ServeMetricsAPI(t *testing.T) {
 		Path:    "/dashboard",
 	}
 	m := metrics.NewMetrics()
-	
+
 	// Set some test values
-	m.RequestsTotal.Inc()
-	m.LoginSuccess.Inc()
-	m.EmailsSent.Inc()
-	m.DBQueriesTotal.Inc()
-	
+	m.RequestsTotal().Inc()
+	m.LoginSuccess().Inc()
+	m.EmailsSent().Inc()
+	m.DBQueriesTotal().Inc()
+
 	dashboard := NewDashboard(config, m)
 
 	req, err := http.NewRequest("GET", "/dashboard/api/metrics", nil)
@@ -256,23 +256,23 @@ func TestDashboard_CollectDashboardData(t *testing.T) {
 		Path:    "/dashboard",
 	}
 	m := metrics.NewMetrics()
-	
+
 	// Set various metric values
-	m.GoRoutines.Set(10)
-	m.MemoryAllocated.Set(10485760.0) // 10 MB in bytes
-	m.RequestsTotal.Add(100)
-	m.RequestsInFlight.Set(5.0)
-	m.ActiveSessions.Set(25.0)
-	m.LoginSuccess.Add(50)
-	m.LoginFailure.Add(10)
-	m.EmailsSent.Add(200)
-	m.EmailQueue.Set(3.0)
-	m.DBConnections.Set(10.0)
-	m.DBQueriesTotal.Add(1000)
-	
+	m.GoRoutines().Set(10)
+	m.MemoryAllocated().Set(10485760.0) // 10 MB in bytes
+	m.RequestsTotal().Add(100)
+	m.RequestsInFlight().Set(5.0)
+	m.ActiveSessions().Set(25.0)
+	m.LoginSuccess().Add(50)
+	m.LoginFailure().Add(10)
+	m.EmailsSent().Add(200)
+	m.EmailQueue().Set(3.0)
+	m.DBConnections().Set(10.0)
+	m.DBQueriesTotal().Add(1000)
+
 	dashboard := NewDashboard(config, m)
 	data := dashboard.collectDashboardData()
-	
+
 	// Verify system metrics
 	if data.System.GoRoutines != 10 {
 		t.Errorf("Expected 10 goroutines, got %d", data.System.GoRoutines)
@@ -280,7 +280,7 @@ func TestDashboard_CollectDashboardData(t *testing.T) {
 	if data.System.MemoryAllocated != 10.0 {
 		t.Errorf("Expected 10 MB allocated, got %f", data.System.MemoryAllocated)
 	}
-	
+
 	// Verify HTTP metrics
 	if data.HTTP.RequestsTotal != 100 {
 		t.Errorf("Expected 100 requests total, got %d", data.HTTP.RequestsTotal)
@@ -288,7 +288,7 @@ func TestDashboard_CollectDashboardData(t *testing.T) {
 	if data.HTTP.RequestsInFlight != 5.0 {
 		t.Errorf("Expected 5 requests in flight, got %f", data.HTTP.RequestsInFlight)
 	}
-	
+
 	// Verify auth metrics
 	if data.Auth.ActiveSessions != 25.0 {
 		t.Errorf("Expected 25 active sessions, got %f", data.Auth.ActiveSessions)
@@ -296,7 +296,7 @@ func TestDashboard_CollectDashboardData(t *testing.T) {
 	if data.Auth.LoginSuccess != 50 {
 		t.Errorf("Expected 50 successful logins, got %d", data.Auth.LoginSuccess)
 	}
-	
+
 	// Verify email metrics
 	if data.Email.EmailsSent != 200 {
 		t.Errorf("Expected 200 emails sent, got %d", data.Email.EmailsSent)
@@ -304,7 +304,7 @@ func TestDashboard_CollectDashboardData(t *testing.T) {
 	if data.Email.QueueSize != 3.0 {
 		t.Errorf("Expected queue size 3, got %f", data.Email.QueueSize)
 	}
-	
+
 	// Verify database metrics
 	if data.Database.ActiveConnections != 10.0 {
 		t.Errorf("Expected 10 active connections, got %f", data.Database.ActiveConnections)

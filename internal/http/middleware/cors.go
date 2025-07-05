@@ -42,7 +42,7 @@ func DefaultCORSConfig() CORSConfig {
 			"X-RateLimit-Reset",
 		},
 		AllowCredentials: true,
-		MaxAge:          86400, // 24 hours
+		MaxAge:           86400, // 24 hours
 	}
 }
 
@@ -70,7 +70,7 @@ func StrictCORSConfig(allowedOrigins []string) CORSConfig {
 			"X-RateLimit-Reset",
 		},
 		AllowCredentials: true,
-		MaxAge:          3600, // 1 hour
+		MaxAge:           3600, // 1 hour
 	}
 }
 
@@ -100,7 +100,7 @@ func NewCORS(config CORSConfig) func(http.Handler) http.Handler {
 					w.Header().Set("Access-Control-Allow-Origin", origin)
 					w.Header().Set("Vary", "Origin")
 				}
-				
+
 				if config.AllowCredentials {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
 				}
@@ -120,7 +120,7 @@ func NewCORS(config CORSConfig) func(http.Handler) http.Handler {
 						w.WriteHeader(http.StatusForbidden)
 						return
 					}
-					
+
 					// Handle requested headers
 					requestedHeaders := r.Header.Get("Access-Control-Request-Headers")
 					if requestedHeaders != "" {
@@ -131,7 +131,7 @@ func NewCORS(config CORSConfig) func(http.Handler) http.Handler {
 						}
 						w.Header().Set("Access-Control-Allow-Headers", requestedHeaders)
 					}
-					
+
 					w.Header().Set("Access-Control-Allow-Methods", allowedMethods)
 					w.Header().Set("Access-Control-Max-Age", maxAge)
 					w.WriteHeader(http.StatusNoContent)
@@ -160,16 +160,16 @@ func isAllowedOrigin(origin string, allowedOrigins []string) bool {
 			if len(wildcardParts) == 2 {
 				scheme := wildcardParts[0]
 				wildcardDomain := wildcardParts[1]
-				
+
 				// Extract origin parts
 				originParts := strings.SplitN(origin, "://", 2)
 				if len(originParts) == 2 && originParts[0] == scheme {
 					originDomain := originParts[1]
-					
+
 					// Remove the "*" and check if origin matches the pattern
 					if strings.HasPrefix(wildcardDomain, "*.") {
 						baseDomain := wildcardDomain[1:] // Keeps the dot
-						
+
 						// Check if origin ends with the base domain and has a subdomain
 						if strings.HasSuffix(originDomain, baseDomain) {
 							// Make sure there's a subdomain (not just the base domain)
@@ -199,7 +199,7 @@ func isMethodAllowed(method string, allowed []string) bool {
 // areHeadersAllowed checks if all requested headers are allowed
 func areHeadersAllowed(requested string, allowed []string) bool {
 	requestedHeaders := strings.Split(requested, ",")
-	
+
 	// Create a map for faster lookup
 	allowedMap := make(map[string]bool)
 	for _, h := range allowed {
@@ -220,10 +220,10 @@ func areHeadersAllowed(requested string, allowed []string) bool {
 // isSimpleHeader checks if a header is a simple header per CORS spec
 func isSimpleHeader(header string) bool {
 	simpleHeaders := map[string]bool{
-		"accept":          true,
-		"accept-language": true,
+		"accept":           true,
+		"accept-language":  true,
 		"content-language": true,
-		"content-type":    true, // with restrictions, but we'll allow it
+		"content-type":     true, // with restrictions, but we'll allow it
 	}
 	return simpleHeaders[header]
 }

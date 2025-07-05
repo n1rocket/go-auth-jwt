@@ -6,19 +6,19 @@ import (
 	"log"
 	"os"
 
+	_ "github.com/lib/pq"
 	"github.com/n1rocket/go-auth-jwt/internal/config"
 	"github.com/n1rocket/go-auth-jwt/internal/db"
-	_ "github.com/lib/pq"
 )
 
 func main() {
 	var (
-		command         string
-		steps           int
-		version         int
-		migrationsPath  string
-		databaseDSN     string
-		useEmbedded     bool
+		command        string
+		steps          int
+		version        int
+		migrationsPath string
+		databaseDSN    string
+		useEmbedded    bool
 	)
 
 	flag.StringVar(&command, "command", "up", "Migration command: up, down, steps, version, force")
@@ -96,7 +96,7 @@ func main() {
 		}
 		fmt.Printf("Forcing migration to version %d...\n", version)
 		fmt.Println("WARNING: This is a dangerous operation!")
-		
+
 		// Add confirmation
 		fmt.Print("Are you sure? (yes/no): ")
 		var confirm string

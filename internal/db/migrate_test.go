@@ -51,7 +51,7 @@ func TestNewMigrator(t *testing.T) {
 
 func TestMigrationConfig_Defaults(t *testing.T) {
 	var config MigrationConfig
-	
+
 	// Create a mock DB
 	mockDB, _, err := sqlmock.New()
 	assert.NoError(t, err)
@@ -59,7 +59,7 @@ func TestMigrationConfig_Defaults(t *testing.T) {
 
 	// Create migrator with empty config
 	migrator := NewMigrator(mockDB, config)
-	
+
 	// Check defaults are applied
 	assert.Equal(t, "authdb", migrator.config.DatabaseName)
 	assert.Equal(t, "public", migrator.config.SchemaName)
@@ -90,7 +90,7 @@ func TestMigrator_Up(t *testing.T) {
 
 	// Expect driver creation queries
 	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
-	
+
 	migrator := NewMigrator(db, MigrationConfig{
 		DatabaseName: "testdb",
 		SchemaName:   "public",
@@ -107,7 +107,7 @@ func TestMigrator_Down(t *testing.T) {
 
 	// Expect driver creation queries
 	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
-	
+
 	migrator := NewMigrator(db, MigrationConfig{
 		DatabaseName: "testdb",
 		SchemaName:   "public",
@@ -124,7 +124,7 @@ func TestMigrator_Steps(t *testing.T) {
 
 	// Expect driver creation queries
 	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
-	
+
 	migrator := NewMigrator(db, MigrationConfig{
 		DatabaseName: "testdb",
 		SchemaName:   "public",
@@ -144,7 +144,7 @@ func TestMigrator_Version(t *testing.T) {
 
 	// Expect driver creation queries
 	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
-	
+
 	migrator := NewMigrator(db, MigrationConfig{
 		DatabaseName: "testdb",
 		SchemaName:   "public",
@@ -161,7 +161,7 @@ func TestMigrator_Force(t *testing.T) {
 
 	// Expect driver creation queries
 	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
-	
+
 	migrator := NewMigrator(db, MigrationConfig{
 		DatabaseName: "testdb",
 		SchemaName:   "public",
@@ -178,7 +178,7 @@ func TestRunMigrationsFromPath_WithValidDB(t *testing.T) {
 
 	// Expect driver creation queries
 	mock.ExpectExec("SELECT CURRENT_DATABASE()").WillReturnResult(sqlmock.NewResult(0, 0))
-	
+
 	// Test with valid DB but invalid path
 	err := RunMigrationsFromPath(db, "testdata/migrations", MigrationConfig{
 		DatabaseName: "testdb",

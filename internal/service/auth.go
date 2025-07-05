@@ -220,8 +220,14 @@ func (s *AuthService) Refresh(ctx context.Context, input RefreshInput) (*LoginOu
 	}, nil
 }
 
+// LogoutInput represents the input for logout
+type LogoutInput struct {
+	RefreshToken string
+}
+
 // Logout revokes the refresh token
-func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
+func (s *AuthService) Logout(ctx context.Context, input LogoutInput) error {
+	refreshToken := input.RefreshToken
 	if err := s.refreshTokenRepo.Revoke(ctx, refreshToken); err != nil {
 		if errors.Is(err, domain.ErrInvalidToken) {
 			// Token already revoked or doesn't exist - not an error for logout

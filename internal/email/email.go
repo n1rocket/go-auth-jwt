@@ -38,18 +38,18 @@ type Template struct {
 
 // TemplateData represents data for email templates
 type TemplateData struct {
-	BaseURL               string
-	AppName               string
-	SupportEmail          string
-	CurrentYear           int
-	RecipientEmail        string
-	RecipientName         string
-	VerificationToken     string
-	VerificationURL       string
-	ResetToken           string
-	ResetURL             string
-	LoginURL             string
-	ExpirationHours      int
+	BaseURL           string
+	AppName           string
+	SupportEmail      string
+	CurrentYear       int
+	RecipientEmail    string
+	RecipientName     string
+	VerificationToken string
+	VerificationURL   string
+	ResetToken        string
+	ResetURL          string
+	LoginURL          string
+	ExpirationHours   int
 }
 
 // Templates for different email types

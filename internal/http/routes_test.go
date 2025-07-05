@@ -21,11 +21,11 @@ var ErrNotFound = errors.New("not found")
 
 // Mock repositories
 type mockUserRepository struct {
-	createFunc func(ctx context.Context, user *domain.User) error
-	getByEmailFunc func(ctx context.Context, email string) (*domain.User, error)
-	getByIDFunc func(ctx context.Context, id string) (*domain.User, error)
-	updateFunc func(ctx context.Context, user *domain.User) error
-	deleteFunc func(ctx context.Context, id string) error
+	createFunc        func(ctx context.Context, user *domain.User) error
+	getByEmailFunc    func(ctx context.Context, email string) (*domain.User, error)
+	getByIDFunc       func(ctx context.Context, id string) (*domain.User, error)
+	updateFunc        func(ctx context.Context, user *domain.User) error
+	deleteFunc        func(ctx context.Context, id string) error
 	existsByEmailFunc func(ctx context.Context, email string) (bool, error)
 }
 
@@ -72,16 +72,16 @@ func (m *mockUserRepository) ExistsByEmail(ctx context.Context, email string) (b
 }
 
 type mockRefreshTokenRepository struct {
-	createFunc func(ctx context.Context, token *domain.RefreshToken) error
-	getByTokenFunc func(ctx context.Context, token string) (*domain.RefreshToken, error)
-	getByUserIDFunc func(ctx context.Context, userID string) ([]*domain.RefreshToken, error)
-	updateFunc func(ctx context.Context, token *domain.RefreshToken) error
-	deleteFunc func(ctx context.Context, id string) error
-	deleteByTokenFunc func(ctx context.Context, token string) error
+	createFunc           func(ctx context.Context, token *domain.RefreshToken) error
+	getByTokenFunc       func(ctx context.Context, token string) (*domain.RefreshToken, error)
+	getByUserIDFunc      func(ctx context.Context, userID string) ([]*domain.RefreshToken, error)
+	updateFunc           func(ctx context.Context, token *domain.RefreshToken) error
+	deleteFunc           func(ctx context.Context, id string) error
+	deleteByTokenFunc    func(ctx context.Context, token string) error
 	deleteAllForUserFunc func(ctx context.Context, userID string) error
-	revokeFunc func(ctx context.Context, token string) error
+	revokeFunc           func(ctx context.Context, token string) error
 	revokeAllForUserFunc func(ctx context.Context, userID string) error
-	deleteExpiredFunc func(ctx context.Context) error
+	deleteExpiredFunc    func(ctx context.Context) error
 }
 
 func (m *mockRefreshTokenRepository) Create(ctx context.Context, token *domain.RefreshToken) error {
@@ -158,7 +158,7 @@ func createTestServices() (*service.AuthService, *token.Manager) {
 	userRepo := &mockUserRepository{}
 	refreshTokenRepo := &mockRefreshTokenRepository{}
 	passwordHasher := security.NewDefaultPasswordHasher()
-	
+
 	tokenManager, err := token.NewManager(
 		"HS256",
 		"test-secret-key-for-testing-only",
@@ -170,7 +170,7 @@ func createTestServices() (*service.AuthService, *token.Manager) {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	authService := service.NewAuthService(
 		userRepo,
 		refreshTokenRepo,
@@ -178,18 +178,18 @@ func createTestServices() (*service.AuthService, *token.Manager) {
 		tokenManager,
 		24*time.Hour,
 	)
-	
+
 	return authService, tokenManager
 }
 
 func TestRoutes(t *testing.T) {
 	authService, tokenManager := createTestServices()
 	handler := inthttp.Routes(authService, tokenManager)
-	
+
 	if handler == nil {
 		t.Fatal("Expected handler to be created")
 	}
-	
+
 	// Test various endpoints to ensure they are configured
 	tests := []struct {
 		name       string
@@ -263,7 +263,7 @@ func TestRoutes(t *testing.T) {
 			wantStatus: http.StatusNotFound,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var req *http.Request
@@ -273,10 +273,10 @@ func TestRoutes(t *testing.T) {
 			} else {
 				req = httptest.NewRequest(tt.method, tt.path, nil)
 			}
-			
+
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
-			
+
 			// Some endpoints may return 429 due to rate limiting, which is also acceptable
 			if w.Code != tt.wantStatus && w.Code != http.StatusTooManyRequests {
 				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
@@ -289,15 +289,15 @@ func TestRoutes(t *testing.T) {
 func TestRoutes_CORSHeaders(t *testing.T) {
 	authService, tokenManager := createTestServices()
 	handler := inthttp.Routes(authService, tokenManager)
-	
+
 	// Test OPTIONS request for CORS preflight
 	req := httptest.NewRequest("OPTIONS", "/api/v1/auth/login", nil)
 	req.Header.Set("Origin", "http://localhost:3000")
 	req.Header.Set("Access-Control-Request-Method", "POST")
-	
+
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
-	
+
 	// Just verify that OPTIONS requests are handled
 	if w.Code != http.StatusNoContent && w.Code != http.StatusOK && w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("Expected status 204, 200 or 405 for OPTIONS, got %d", w.Code)
@@ -307,16 +307,16 @@ func TestRoutes_CORSHeaders(t *testing.T) {
 func TestRoutes_SecurityHeaders(t *testing.T) {
 	authService, tokenManager := createTestServices()
 	handler := inthttp.Routes(authService, tokenManager)
-	
+
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
-	
+
 	// Check that we got a valid response
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
-	
+
 	// Check at least one security header is present
 	hasSecurityHeader := false
 	securityHeaders := []string{
@@ -325,14 +325,14 @@ func TestRoutes_SecurityHeaders(t *testing.T) {
 		"Referrer-Policy",
 		"Content-Security-Policy",
 	}
-	
+
 	for _, header := range securityHeaders {
 		if w.Header().Get(header) != "" {
 			hasSecurityHeader = true
 			break
 		}
 	}
-	
+
 	if !hasSecurityHeader {
 		t.Error("Expected at least one security header to be present")
 	}
@@ -343,19 +343,19 @@ func TestHealthEndpoint(t *testing.T) {
 	// This avoids middleware issues with nil services
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", handlers.Health)
-	
+
 	// Create test request
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
-	
+
 	// Execute request
 	mux.ServeHTTP(w, req)
-	
+
 	// Check response
 	if w.Code != http.StatusOK {
 		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
 	}
-	
+
 	// Check content type
 	contentType := w.Header().Get("Content-Type")
 	if contentType != "application/json" {

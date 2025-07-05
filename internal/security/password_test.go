@@ -42,7 +42,7 @@ func TestPasswordHasher_Hash(t *testing.T) {
 		{"complex password", "P@ssw0rd!123#Complex", false},
 		{"empty password", "", false}, // bcrypt accepts empty passwords
 		{"unicode password", "пароль密码🔐", false},
-		{"very long password", strings.Repeat("a", 72), false},  // bcrypt has 72 byte limit
+		{"very long password", strings.Repeat("a", 72), false},    // bcrypt has 72 byte limit
 		{"password exceeds limit", strings.Repeat("a", 73), true}, // Should fail
 	}
 
@@ -213,9 +213,9 @@ func TestConstantTimeCompare(t *testing.T) {
 
 func TestValidatePasswordStrength(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		password string
-		wantErr bool
+		wantErr  bool
 	}{
 		{"valid simple password", "password123", false},
 		{"exactly 8 chars", "12345678", false},

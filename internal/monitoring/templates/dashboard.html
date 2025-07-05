@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <style>
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --success-color: #4caf50;
+            --error-color: #f44336;
+            --warning-color: #ff9800;
+        }
+        
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --border-color: #404040;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--bg-secondary);
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .metric-card h2 {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-success {
+            background-color: var(--success-color);
+        }
+        
+        .status-error {
+            background-color: var(--error-color);
+        }
+        
+        .status-warning {
+            background-color: var(--warning-color);
+        }
+        
+        .chart-container {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 300px;
+        }
+        
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        
+        @media (max-width: 768px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body data-theme="{{.Theme}}">
+    <div class="container">
+        <header>
+            <h1>{{.Title}}</h1>
+        </header>
+        
+        <div class="metrics-grid" id="metrics-container">
+            <!-- Metrics will be populated here -->
+        </div>
+        
+        <div class="chart-container" id="requests-chart">
+            <!-- Request rate chart -->
+        </div>
+        
+        <div class="chart-container" id="auth-chart">
+            <!-- Authentication metrics chart -->
+        </div>
+    </div>
+    
+    <div class="refresh-indicator">
+        Next refresh in <span id="refresh-countdown">{{.RefreshInterval}}</span>s
+    </div>
+    
+    <script>
+        const metricsEndpoint = '{{.MetricsEndpoint}}';
+        const refreshInterval = {{.RefreshInterval}} * 1000;
+        let countdownValue = {{.RefreshInterval}};
+        
+        async function fetchMetrics() {
+            try {
+                const response = await fetch(metricsEndpoint);
+                const data = await response.json();
+                updateDashboard(data);
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+            }
+        }
+        
+        function updateDashboard(data) {
+            const container = document.getElementById('metrics-container');
+            container.innerHTML = '';
+            
+            // System metrics
+            addMetricCard(container, 'Goroutines', data.system.goroutines);
+            addMetricCard(container, 'Memory', data.system.memory_allocated_mb.toFixed(2) + ' MB');
+            addMetricCard(container, 'Uptime', formatUptime(data.system.uptime_seconds));
+            
+            // HTTP metrics
+            addMetricCard(container, 'Total Requests', data.http.requests_total);
+            addMetricCard(container, 'Active Requests', data.http.requests_in_flight);
+            
+            // Auth metrics
+            addMetricCard(container, 'Active Sessions', data.auth.active_sessions);
+            addMetricCard(container, 'Successful Logins', data.auth.login_success);
+            addMetricCard(container, 'Failed Logins', data.auth.login_failure);
+            
+            // Email metrics
+            addMetricCard(container, 'Emails Sent', data.email.emails_sent);
+            addMetricCard(container, 'Email Queue', data.email.queue_size);
+            
+            // Database metrics
+            addMetricCard(container, 'DB Connections', data.database.active_connections);
+            addMetricCard(container, 'DB Queries', data.database.queries_total);
+        }
+        
+        function addMetricCard(container, label, value) {
+            const card = document.createElement('div');
+            card.className = 'metric-card';
+            card.innerHTML = `
+                <h2>${label}</h2>
+                <div class="metric-value">${value}</div>
+            `;
+            container.appendChild(card);
+        }
+        
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        }
+        
+        // Countdown timer
+        setInterval(() => {
+            countdownValue--;
+            if (countdownValue <= 0) {
+                countdownValue = {{.RefreshInterval}};
+                fetchMetrics();
+            }
+            document.getElementById('refresh-countdown').textContent = countdownValue;
+        }, 1000);
+        
+        // Initial fetch
+        fetchMetrics();
+    </script>
+</body>
+</html>

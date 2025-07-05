@@ -413,7 +413,7 @@ func TestWriteError_NilError(t *testing.T) {
 func TestWriteError_WrappedErrors(t *testing.T) {
 	// Test that wrapped errors are properly detected
 	wrappedErr := errors.New("wrapped: " + domain.ErrUserNotFound.Error())
-	
+
 	// This test shows current behavior - wrapped errors aren't detected
 	// In a real implementation, you might want to use errors.Is() throughout
 	w := httptest.NewRecorder()

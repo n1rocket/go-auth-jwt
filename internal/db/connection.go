@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/n1rocket/go-auth-jwt/internal/config"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/n1rocket/go-auth-jwt/internal/config"
 )
 
 // DB wraps the SQL database connection

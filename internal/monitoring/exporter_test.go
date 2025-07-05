@@ -49,9 +49,9 @@ func TestNewExporter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := metrics.NewMetrics()
 			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-			
+
 			exporter := NewExporter(tt.config, m, logger)
-			
+
 			if exporter == nil {
 				t.Fatal("Expected exporter to be created")
 			}
@@ -78,30 +78,30 @@ func TestExporter_CollectMetrics(t *testing.T) {
 			"env": "test",
 		},
 	}
-	
+
 	m := metrics.NewMetrics()
 	// Set some test values
-	m.RequestsTotal.Add(10)
-	m.RequestsInFlight.Set(2.0)
-	m.ActiveSessions.Set(5.0)
-	m.LoginSuccess.Add(3)
-	m.GoRoutines.Set(20)
-	
+	m.RequestsTotal().Add(10)
+	m.RequestsInFlight().Set(2.0)
+	m.ActiveSessions().Set(5.0)
+	m.LoginSuccess().Add(3)
+	m.GoRoutines().Set(20)
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	exporter := NewExporter(config, m, logger)
-	
+
 	hostname := GetHostname()
 	exporter.collectMetrics(hostname)
-	
+
 	// Verify metrics were collected
 	collectedCount := 0
 	timeout := time.After(100 * time.Millisecond)
-	
+
 	for {
 		select {
 		case snapshot := <-exporter.buffer:
 			collectedCount++
-			
+
 			// Verify snapshot properties
 			if snapshot.Hostname != hostname {
 				t.Errorf("Expected hostname %s, got %s", hostname, snapshot.Hostname)
@@ -112,7 +112,7 @@ func TestExporter_CollectMetrics(t *testing.T) {
 			if snapshot.Labels["env"] != "test" {
 				t.Error("Expected global label to be set")
 			}
-			
+
 			// Check specific metrics
 			switch snapshot.Name {
 			case "http_requests_total":
@@ -131,7 +131,7 @@ func TestExporter_CollectMetrics(t *testing.T) {
 					t.Errorf("Expected gauge type for active_sessions")
 				}
 			}
-			
+
 		case <-timeout:
 			if collectedCount == 0 {
 				t.Error("No metrics were collected")
@@ -157,27 +157,27 @@ func TestExporter_Start(t *testing.T) {
 		BufferSize: 10,
 		Format:     "json",
 	}
-	
+
 	m := metrics.NewMetrics()
-	m.RequestsTotal.Inc()
-	
+	m.RequestsTotal().Inc()
+
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	exporter := NewExporter(config, m, logger)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Start exporter
 	done := make(chan error, 1)
 	go func() {
 		done <- exporter.Start(ctx)
 	}()
-	
+
 	// Let it run for a bit
 	time.Sleep(300 * time.Millisecond)
-	
+
 	// Stop exporter
 	cancel()
-	
+
 	// Wait for completion
 	select {
 	case err := <-done:
@@ -187,17 +187,17 @@ func TestExporter_Start(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Error("Start did not return after context cancellation")
 	}
-	
+
 	// Check that metrics were written to file
 	data, err := os.ReadFile(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read metrics file: %v", err)
 	}
-	
+
 	if len(data) == 0 {
 		t.Error("No metrics were written to file")
 	}
-	
+
 	// Verify JSON format
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	for _, line := range lines {
@@ -264,29 +264,29 @@ func TestExporter_ExportToStdout(t *testing.T) {
 				Format:     tt.format,
 				BufferSize: 1,
 			}
-			
+
 			m := metrics.NewMetrics()
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			exporter := NewExporter(config, m, logger)
-			
+
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			
+
 			// Start stdout exporter
 			go exporter.exportToStdout(ctx)
-			
+
 			// Send metric
 			exporter.buffer <- tt.snapshot
 			time.Sleep(50 * time.Millisecond)
-			
+
 			// Restore stdout
 			w.Close()
 			os.Stdout = old
-			
+
 			// Read output
 			output, _ := io.ReadAll(r)
 			outputStr := string(output)
-			
+
 			// Verify output
 			for _, expected := range tt.contains {
 				if !strings.Contains(outputStr, expected) {
@@ -301,7 +301,7 @@ func TestExporter_SendHTTPBatch(t *testing.T) {
 	// Create test server
 	received := false
 	var receivedBatch []MetricSnapshot
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST, got %s", r.Method)
@@ -309,12 +309,12 @@ func TestExporter_SendHTTPBatch(t *testing.T) {
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Errorf("Expected application/json content type")
 		}
-		
+
 		var batch []MetricSnapshot
 		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
 			t.Errorf("Failed to decode batch: %v", err)
 		}
-		
+
 		received = true
 		receivedBatch = batch
 		w.WriteHeader(http.StatusOK)
@@ -324,11 +324,11 @@ func TestExporter_SendHTTPBatch(t *testing.T) {
 	config := ExporterConfig{
 		HTTPPush: server.URL,
 	}
-	
+
 	m := metrics.NewMetrics()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	exporter := NewExporter(config, m, logger)
-	
+
 	// Create test batch
 	batch := []MetricSnapshot{
 		{
@@ -344,11 +344,11 @@ func TestExporter_SendHTTPBatch(t *testing.T) {
 			Timestamp: time.Now().Unix(),
 		},
 	}
-	
+
 	// Send batch
 	client := &http.Client{Timeout: 1 * time.Second}
 	exporter.sendHTTPBatch(client, batch)
-	
+
 	// Verify
 	if !received {
 		t.Error("HTTP batch was not received")
@@ -371,17 +371,17 @@ func TestExporter_ExportToHTTP(t *testing.T) {
 		HTTPPush:  server.URL,
 		BatchSize: 2,
 	}
-	
+
 	m := metrics.NewMetrics()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	exporter := NewExporter(config, m, logger)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	// Start HTTP exporter
 	go exporter.exportToHTTP(ctx)
-	
+
 	// Send metrics
 	for i := 0; i < 3; i++ {
 		exporter.buffer <- MetricSnapshot{
@@ -390,10 +390,10 @@ func TestExporter_ExportToHTTP(t *testing.T) {
 			Timestamp: time.Now().Unix(),
 		}
 	}
-	
+
 	// Wait for batch to be sent
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Should have sent one batch (first 2 metrics)
 	if requestCount != 1 {
 		t.Errorf("Expected 1 request, got %d", requestCount)
@@ -404,20 +404,20 @@ func TestExporter_BufferOverflow(t *testing.T) {
 	config := ExporterConfig{
 		BufferSize: 2, // Small buffer
 	}
-	
+
 	m := metrics.NewMetrics()
-	
+
 	// Use a custom logger to capture warnings
 	var logBuffer bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&logBuffer, nil))
-	
+
 	exporter := NewExporter(config, m, logger)
-	
+
 	// Fill buffer beyond capacity
 	for i := 0; i < 5; i++ {
 		exporter.collectMetrics("test-host")
 	}
-	
+
 	// Check that warning was logged
 	logOutput := logBuffer.String()
 	if !strings.Contains(logOutput, "Metrics buffer full") {

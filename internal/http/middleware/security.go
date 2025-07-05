@@ -10,23 +10,23 @@ import (
 type SecurityConfig struct {
 	// Content Security Policy
 	ContentSecurityPolicy string
-	
+
 	// Cross-Origin policies
-	CrossOriginEmbedderPolicy   string
-	CrossOriginOpenerPolicy     string
-	CrossOriginResourcePolicy   string
-	
+	CrossOriginEmbedderPolicy string
+	CrossOriginOpenerPolicy   string
+	CrossOriginResourcePolicy string
+
 	// HSTS
 	StrictTransportSecurity string
 	ForceHTTPS              bool
-	
+
 	// Other security headers
-	XContentTypeOptions    string
-	XFrameOptions          string
-	XSSProtection          string
-	ReferrerPolicy         string
-	PermissionsPolicy      string
-	
+	XContentTypeOptions string
+	XFrameOptions       string
+	XSSProtection       string
+	ReferrerPolicy      string
+	PermissionsPolicy   string
+
 	// Custom headers
 	CustomHeaders map[string]string
 }
@@ -35,20 +35,20 @@ type SecurityConfig struct {
 func DefaultSecurityConfig() SecurityConfig {
 	return SecurityConfig{
 		ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';",
-		
-		CrossOriginEmbedderPolicy:  "require-corp",
-		CrossOriginOpenerPolicy:    "same-origin",
-		CrossOriginResourcePolicy:  "same-origin",
-		
+
+		CrossOriginEmbedderPolicy: "require-corp",
+		CrossOriginOpenerPolicy:   "same-origin",
+		CrossOriginResourcePolicy: "same-origin",
+
 		StrictTransportSecurity: "max-age=31536000; includeSubDomains",
 		ForceHTTPS:              true,
-		
+
 		XContentTypeOptions: "nosniff",
 		XFrameOptions:       "DENY",
 		XSSProtection:       "1; mode=block",
 		ReferrerPolicy:      "strict-origin-when-cross-origin",
 		PermissionsPolicy:   "geolocation=(), microphone=(), camera=()",
-		
+
 		CustomHeaders: make(map[string]string),
 	}
 }
@@ -57,20 +57,20 @@ func DefaultSecurityConfig() SecurityConfig {
 func StrictSecurityConfig() SecurityConfig {
 	return SecurityConfig{
 		ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;",
-		
-		CrossOriginEmbedderPolicy:  "require-corp",
-		CrossOriginOpenerPolicy:    "same-origin",
-		CrossOriginResourcePolicy:  "same-origin",
-		
+
+		CrossOriginEmbedderPolicy: "require-corp",
+		CrossOriginOpenerPolicy:   "same-origin",
+		CrossOriginResourcePolicy: "same-origin",
+
 		StrictTransportSecurity: "max-age=31536000; includeSubDomains",
 		ForceHTTPS:              true,
-		
+
 		XContentTypeOptions: "nosniff",
 		XFrameOptions:       "DENY",
 		XSSProtection:       "0", // Disabled in modern browsers, can cause issues
 		ReferrerPolicy:      "no-referrer",
 		PermissionsPolicy:   "accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), navigation-override=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()",
-		
+
 		CustomHeaders: map[string]string{
 			"X-Permitted-Cross-Domain-Policies": "none",
 		},
@@ -81,20 +81,20 @@ func StrictSecurityConfig() SecurityConfig {
 func APISecurityConfig() SecurityConfig {
 	return SecurityConfig{
 		ContentSecurityPolicy: "", // Not needed for APIs
-		
-		CrossOriginEmbedderPolicy:  "require-corp",
-		CrossOriginOpenerPolicy:    "same-origin",
-		CrossOriginResourcePolicy:  "cross-origin", // Allow API access from different origins
-		
+
+		CrossOriginEmbedderPolicy: "require-corp",
+		CrossOriginOpenerPolicy:   "same-origin",
+		CrossOriginResourcePolicy: "cross-origin", // Allow API access from different origins
+
 		StrictTransportSecurity: "",
 		ForceHTTPS:              false,
-		
+
 		XContentTypeOptions: "nosniff",
 		XFrameOptions:       "DENY",
 		XSSProtection:       "",
 		ReferrerPolicy:      "strict-origin-when-cross-origin",
 		PermissionsPolicy:   "",
-		
+
 		CustomHeaders: make(map[string]string),
 	}
 }
@@ -115,23 +115,23 @@ func SecurityHeaders(config SecurityConfig) func(http.Handler) http.Handler {
 			setHeader(w, "Cross-Origin-Embedder-Policy", config.CrossOriginEmbedderPolicy)
 			setHeader(w, "Cross-Origin-Opener-Policy", config.CrossOriginOpenerPolicy)
 			setHeader(w, "Cross-Origin-Resource-Policy", config.CrossOriginResourcePolicy)
-			
+
 			// HSTS only on HTTPS connections
 			if (r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https") && config.StrictTransportSecurity != "" {
 				w.Header().Set("Strict-Transport-Security", config.StrictTransportSecurity)
 			}
-			
+
 			setHeader(w, "X-Content-Type-Options", config.XContentTypeOptions)
 			setHeader(w, "X-Frame-Options", config.XFrameOptions)
 			setHeader(w, "X-XSS-Protection", config.XSSProtection)
 			setHeader(w, "Referrer-Policy", config.ReferrerPolicy)
 			setHeader(w, "Permissions-Policy", config.PermissionsPolicy)
-			
+
 			// Set custom headers
 			for name, value := range config.CustomHeaders {
 				w.Header().Set(name, value)
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -219,14 +219,14 @@ func (b *CSPBuilder) UpgradeInsecureRequests() *CSPBuilder {
 // Build creates the CSP string
 func (b *CSPBuilder) Build() string {
 	var parts []string
-	
+
 	// Ensure consistent order
 	order := []string{
 		"default-src", "script-src", "style-src", "img-src", "font-src",
 		"connect-src", "media-src", "object-src", "frame-src", "worker-src",
 		"form-action", "frame-ancestors", "base-uri", "upgrade-insecure-requests",
 	}
-	
+
 	for _, directive := range order {
 		if sources, ok := b.directives[directive]; ok {
 			if len(sources) == 0 {
@@ -237,7 +237,7 @@ func (b *CSPBuilder) Build() string {
 			}
 		}
 	}
-	
+
 	// Add any directives not in the order list
 	for directive, sources := range b.directives {
 		found := false
@@ -255,7 +255,7 @@ func (b *CSPBuilder) Build() string {
 			}
 		}
 	}
-	
+
 	return strings.Join(parts, "; ")
 }
 

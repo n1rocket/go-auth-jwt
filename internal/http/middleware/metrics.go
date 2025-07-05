@@ -31,8 +31,8 @@ func Metrics(m *metrics.Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Track in-flight requests
-			m.RequestsInFlight.Inc()
-			defer m.RequestsInFlight.Dec()
+			m.RequestsInFlight().Inc()
+			defer m.RequestsInFlight().Dec()
 
 			// Start timer
 			start := time.Now()
@@ -68,15 +68,15 @@ func normalizePath(path string) string {
 	patterns := map[string]string{
 		// Auth endpoints
 		"/api/v1/auth/verify-email": "/api/v1/auth/verify-email",
-		"/api/v1/auth/signup":        "/api/v1/auth/signup",
-		"/api/v1/auth/login":         "/api/v1/auth/login",
-		"/api/v1/auth/logout":        "/api/v1/auth/logout",
-		"/api/v1/auth/refresh":       "/api/v1/auth/refresh",
-		"/api/v1/auth/me":            "/api/v1/auth/me",
-		
+		"/api/v1/auth/signup":       "/api/v1/auth/signup",
+		"/api/v1/auth/login":        "/api/v1/auth/login",
+		"/api/v1/auth/logout":       "/api/v1/auth/logout",
+		"/api/v1/auth/refresh":      "/api/v1/auth/refresh",
+		"/api/v1/auth/me":           "/api/v1/auth/me",
+
 		// Health endpoints
-		"/health": "/health",
-		"/ready":  "/ready",
+		"/health":  "/health",
+		"/ready":   "/ready",
 		"/metrics": "/metrics",
 	}
 
@@ -106,70 +106,70 @@ func NewMetricsCollector(m *metrics.Metrics) *MetricsCollector {
 
 // RecordLogin records login metrics
 func (mc *MetricsCollector) RecordLogin(success bool, duration time.Duration) {
-	mc.metrics.LoginAttempts.Inc()
+	mc.metrics.LoginAttempts().Inc()
 	if success {
-		mc.metrics.LoginSuccess.Inc()
-		mc.metrics.ActiveSessions.Inc()
+		mc.metrics.LoginSuccess().Inc()
+		mc.metrics.ActiveSessions().Inc()
 	} else {
-		mc.metrics.LoginFailure.Inc()
+		mc.metrics.LoginFailure().Inc()
 	}
 }
 
 // RecordSignup records signup metrics
 func (mc *MetricsCollector) RecordSignup(success bool, duration time.Duration) {
-	mc.metrics.SignupAttempts.Inc()
+	mc.metrics.SignupAttempts().Inc()
 	if success {
-		mc.metrics.SignupSuccess.Inc()
-		mc.metrics.UsersTotal.Inc()
+		mc.metrics.SignupSuccess().Inc()
+		mc.metrics.UsersTotal().Inc()
 	} else {
-		mc.metrics.SignupFailure.Inc()
+		mc.metrics.SignupFailure().Inc()
 	}
 }
 
 // RecordTokenIssued records token issuance
 func (mc *MetricsCollector) RecordTokenIssued(tokenType string) {
 	labels := map[string]string{"type": tokenType}
-	mc.metrics.TokensIssued.WithLabels(labels).Inc()
+	mc.metrics.TokensIssued().WithLabels(labels).Inc()
 }
 
 // RecordTokenRefreshed records token refresh
 func (mc *MetricsCollector) RecordTokenRefreshed() {
-	mc.metrics.TokensRefreshed.Inc()
+	mc.metrics.TokensRefreshed().Inc()
 }
 
 // RecordTokenRevoked records token revocation
 func (mc *MetricsCollector) RecordTokenRevoked(reason string) {
 	labels := map[string]string{"reason": reason}
-	mc.metrics.TokensRevoked.WithLabels(labels).Inc()
-	mc.metrics.ActiveSessions.Dec()
+	mc.metrics.TokensRevoked().WithLabels(labels).Inc()
+	mc.metrics.ActiveSessions().Dec()
 }
 
 // RecordEmailQueued records email queuing
 func (mc *MetricsCollector) RecordEmailQueued(emailType string) {
-	mc.metrics.EmailQueue.Inc()
+	mc.metrics.EmailQueue().Inc()
 }
 
 // RecordEmailProcessed records email processing
 func (mc *MetricsCollector) RecordEmailProcessed(emailType string, duration time.Duration, err error) {
-	mc.metrics.EmailQueue.Dec()
+	mc.metrics.EmailQueue().Dec()
 	mc.metrics.RecordEmailSent(emailType, duration, err)
 }
 
 // RecordUserVerified records user verification
 func (mc *MetricsCollector) RecordUserVerified() {
-	mc.metrics.UsersVerified.Inc()
+	mc.metrics.UsersVerified().Inc()
 }
 
 // RecordPasswordReset records password reset request
 func (mc *MetricsCollector) RecordPasswordReset() {
-	mc.metrics.PasswordResets.Inc()
+	mc.metrics.PasswordResets().Inc()
 }
 
 // RecordRateLimit records rate limit events
 func (mc *MetricsCollector) RecordRateLimit(exceeded bool, endpoint string) {
 	labels := map[string]string{"endpoint": endpoint}
-	mc.metrics.RateLimitHits.WithLabels(labels).Inc()
+	mc.metrics.RateLimitHits().WithLabels(labels).Inc()
 	if exceeded {
-		mc.metrics.RateLimitExceeded.WithLabels(labels).Inc()
+		mc.metrics.RateLimitExceeded().WithLabels(labels).Inc()
 	}
 }

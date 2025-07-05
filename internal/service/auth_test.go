@@ -465,22 +465,22 @@ func TestAuthService_Refresh(t *testing.T) {
 				// The old token should be revoked
 				// Let's wait a bit to ensure different timestamps
 				time.Sleep(10 * time.Millisecond)
-				
+
 				// Check all tokens to debug
 				allTokens, _ := refreshTokenRepo.GetByUserID(ctx, "user-refresh@example.com")
 				t.Logf("Total tokens for user: %d", len(allTokens))
 				t.Logf("Login token: %s", loginOutput.RefreshToken)
 				t.Logf("New token: %s", output.RefreshToken)
-				
+
 				for i, tk := range allTokens {
 					t.Logf("Token %d: %s, Revoked: %v", i, tk.Token, tk.Revoked)
 				}
-				
+
 				// The count should be 2: old (revoked) and new
 				if len(allTokens) != 2 {
 					t.Errorf("Expected 2 tokens, got %d", len(allTokens))
 				}
-				
+
 				// Check the old token specifically
 				oldToken, err := refreshTokenRepo.GetByToken(ctx, loginOutput.RefreshToken)
 				if err != nil {

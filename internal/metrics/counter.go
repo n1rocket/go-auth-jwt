@@ -46,18 +46,18 @@ func (c *Counter) Add(delta int64) {
 // WithLabels returns a labeled counter
 func (c *Counter) WithLabels(labels map[string]string) *LabeledCounter {
 	key := labelsToKey(labels)
-	
+
 	c.mu.RLock()
 	lc, exists := c.labels[key]
 	c.mu.RUnlock()
-	
+
 	if !exists {
 		c.mu.Lock()
 		lc = &labeledCounter{labels: labels}
 		c.labels[key] = lc
 		c.mu.Unlock()
 	}
-	
+
 	return &LabeledCounter{counter: lc}
 }
 
@@ -79,7 +79,7 @@ func (c *Counter) String() string {
 // Reset resets the counter to zero
 func (c *Counter) Reset() {
 	atomic.StoreInt64(&c.value, 0)
-	
+
 	c.mu.Lock()
 	c.labels = make(map[string]*labeledCounter)
 	c.mu.Unlock()
@@ -113,7 +113,7 @@ func labelsToKey(labels map[string]string) string {
 	if len(labels) == 0 {
 		return ""
 	}
-	
+
 	key := ""
 	for k, v := range labels {
 		if key != "" {

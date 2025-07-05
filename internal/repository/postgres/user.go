@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/n1rocket/go-auth-jwt/internal/domain"
 	"github.com/n1rocket/go-auth-jwt/internal/repository"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (

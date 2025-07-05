@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
 	"github.com/n1rocket/go-auth-jwt/internal/token"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 // Mock token manager
@@ -110,16 +110,16 @@ func TestRequireAuth(t *testing.T) {
 				if ok && userID != "" && userID != "user-123" {
 					t.Errorf("Unexpected user ID: %s", userID)
 				}
-				
+
 				// Check email in context
 				email, ok := r.Context().Value("email").(string)
 				if tt.expectedUser && (!ok || email != "user@example.com") {
 					t.Errorf("Expected email in context, got %s", email)
 				}
-				
+
 				w.WriteHeader(http.StatusOK)
 			})
-			
+
 			// Create a custom handler that uses our mock
 			customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Extract token from Authorization header
@@ -129,17 +129,17 @@ func TestRequireAuth(t *testing.T) {
 						tokenString = tt.authHeader[7:]
 					}
 				}
-				
+
 				if tokenString == "" && tt.authHeader != "" {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
-				
+
 				if tokenString == "" {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
-				
+
 				// Validate token
 				claims, err := tt.tokenManager.ValidateAccessToken(tokenString)
 				if err != nil {
@@ -240,7 +240,7 @@ func TestOptionalAuth(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusOK)
 			})
-			
+
 			// Create a custom handler that uses our mock
 			customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Try to extract token from Authorization header
@@ -248,13 +248,13 @@ func TestOptionalAuth(t *testing.T) {
 				if tt.authHeader != "" && len(tt.authHeader) > 7 && tt.authHeader[:7] == "Bearer " {
 					tokenString = tt.authHeader[7:]
 				}
-				
+
 				if tokenString == "" {
 					// No token - continue without auth
 					handler.ServeHTTP(w, r)
 					return
 				}
-				
+
 				// Try to validate token
 				claims, err := tt.tokenManager.ValidateAccessToken(tokenString)
 				if err != nil {
@@ -289,24 +289,24 @@ func TestOptionalAuth(t *testing.T) {
 
 func TestRequireVerifiedEmail(t *testing.T) {
 	tests := []struct {
-		name             string
-		emailVerified    *bool
-		expectedStatus   int
+		name           string
+		emailVerified  *bool
+		expectedStatus int
 	}{
 		{
-			name:             "verified email",
-			emailVerified:    boolPtr(true),
-			expectedStatus:   http.StatusOK,
+			name:           "verified email",
+			emailVerified:  boolPtr(true),
+			expectedStatus: http.StatusOK,
 		},
 		{
-			name:             "unverified email",
-			emailVerified:    boolPtr(false),
-			expectedStatus:   http.StatusUnauthorized,
+			name:           "unverified email",
+			emailVerified:  boolPtr(false),
+			expectedStatus: http.StatusUnauthorized,
 		},
 		{
-			name:             "no email verification in context",
-			emailVerified:    nil,
-			expectedStatus:   http.StatusUnauthorized,
+			name:           "no email verification in context",
+			emailVerified:  nil,
+			expectedStatus: http.StatusUnauthorized,
 		},
 	}
 

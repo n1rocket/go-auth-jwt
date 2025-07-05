@@ -53,7 +53,7 @@ func (g *Gauge) Add(delta float64) {
 		oldValue := math.Float64frombits(oldBits)
 		newValue := oldValue + delta
 		newBits := math.Float64bits(newValue)
-		
+
 		if atomic.CompareAndSwapUint64(&g.value, oldBits, newBits) {
 			break
 		}
@@ -63,11 +63,11 @@ func (g *Gauge) Add(delta float64) {
 // WithLabels returns a labeled gauge
 func (g *Gauge) WithLabels(labels map[string]string) *LabeledGauge {
 	key := labelsToKey(labels)
-	
+
 	g.mu.RLock()
 	lg, exists := g.labels[key]
 	g.mu.RUnlock()
-	
+
 	if !exists {
 		g.mu.Lock()
 		// Check again after acquiring write lock
@@ -78,7 +78,7 @@ func (g *Gauge) WithLabels(labels map[string]string) *LabeledGauge {
 		}
 		g.mu.Unlock()
 	}
-	
+
 	return &LabeledGauge{gauge: lg}
 }
 
@@ -101,7 +101,7 @@ func (g *Gauge) String() string {
 // Reset resets the gauge to zero
 func (g *Gauge) Reset() {
 	atomic.StoreUint64(&g.value, 0)
-	
+
 	g.mu.Lock()
 	g.labels = make(map[string]*labeledGauge)
 	g.mu.Unlock()
@@ -134,7 +134,7 @@ func (lg *LabeledGauge) Add(delta float64) {
 		oldValue := math.Float64frombits(oldBits)
 		newValue := oldValue + delta
 		newBits := math.Float64bits(newValue)
-		
+
 		if atomic.CompareAndSwapUint64(&lg.gauge.value, oldBits, newBits) {
 			break
 		}

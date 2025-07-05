@@ -61,14 +61,14 @@ func TestDecodeJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tt.body))
-			
+
 			var dst testStruct
 			err := DecodeJSON(req, &dst)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DecodeJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
 				t.Errorf("Expected error containing %q, got %q", tt.errMsg, err.Error())
 			}
@@ -124,13 +124,13 @@ func TestValidateContentType(t *testing.T) {
 			if tt.contentType != "" {
 				req.Header.Set("Content-Type", tt.contentType)
 			}
-			
+
 			err := ValidateContentType(req, tt.expectedType)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateContentType() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
 				t.Errorf("Expected error containing %q, got %q", tt.errMsg, err.Error())
 			}
@@ -175,10 +175,10 @@ func TestValidateJSONRequest(t *testing.T) {
 			if tt.contentType != "" {
 				req.Header.Set("Content-Type", tt.contentType)
 			}
-			
+
 			var dst testStruct
 			err := ValidateJSONRequest(req, &dst)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateJSONRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -229,7 +229,7 @@ func TestValidateRequiredFields(t *testing.T) {
 			if len(got) != tt.want {
 				t.Errorf("ValidateRequiredFields() returned %d errors, want %d", len(got), tt.want)
 			}
-			
+
 			// Check error structure
 			for _, err := range got {
 				if err.Code != "REQUIRED_FIELD" {
@@ -356,7 +356,7 @@ func TestValidatePassword(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidatePassword() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
 				t.Errorf("Expected error containing %q, got %q", tt.errMsg, err.Error())
 			}
@@ -524,17 +524,17 @@ func TestExtractBearerToken(t *testing.T) {
 			if tt.authHeader != "" {
 				req.Header.Set("Authorization", tt.authHeader)
 			}
-			
+
 			got, err := ExtractBearerToken(req)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExtractBearerToken() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
 				t.Errorf("Expected error containing %q, got %q", tt.errMsg, err.Error())
 			}
-			
+
 			if !tt.wantErr && got != tt.want {
 				t.Errorf("ExtractBearerToken() = %q, want %q", got, tt.want)
 			}
@@ -547,10 +547,10 @@ func TestDecodeJSON_BodySizeLimit(t *testing.T) {
 	// Create a reader that simulates a large body
 	largeBody := &infiniteReader{}
 	req := httptest.NewRequest(http.MethodPost, "/", largeBody)
-	
+
 	var dst interface{}
 	err := DecodeJSON(req, &dst)
-	
+
 	if err == nil {
 		t.Error("Expected error for oversized body")
 	}
@@ -578,11 +578,11 @@ func TestValidationError_Structure(t *testing.T) {
 	errors := ValidateRequiredFields(map[string]string{
 		"email": "",
 	})
-	
+
 	if len(errors) != 1 {
 		t.Fatalf("Expected 1 error, got %d", len(errors))
 	}
-	
+
 	err := errors[0]
 	if err.Field != "email" {
 		t.Errorf("Expected field 'email', got %q", err.Field)

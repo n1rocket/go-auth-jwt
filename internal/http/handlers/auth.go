@@ -201,7 +201,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call service
-	if err := h.authService.Logout(r.Context(), req.RefreshToken); err != nil {
+	if err := h.authService.Logout(r.Context(), service.LogoutInput{RefreshToken: req.RefreshToken}); err != nil {
 		response.WriteError(w, err)
 		return
 	}

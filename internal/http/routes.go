@@ -30,11 +30,11 @@ func Routes(authService *service.AuthService, tokenManager *token.Manager) http.
 	mux.Handle("POST /api/v1/auth/verify-email", authLimiter(http.HandlerFunc(authHandler.VerifyEmail)))
 
 	// Protected routes with API rate limiting
-	mux.Handle("POST /api/v1/auth/logout", 
+	mux.Handle("POST /api/v1/auth/logout",
 		apiLimiter(middleware.RequireAuth(tokenManager, http.HandlerFunc(authHandler.Logout))))
-	mux.Handle("POST /api/v1/auth/logout-all", 
+	mux.Handle("POST /api/v1/auth/logout-all",
 		apiLimiter(middleware.RequireAuth(tokenManager, http.HandlerFunc(authHandler.LogoutAll))))
-	mux.Handle("GET /api/v1/auth/me", 
+	mux.Handle("GET /api/v1/auth/me",
 		apiLimiter(middleware.RequireAuth(tokenManager, http.HandlerFunc(authHandler.GetCurrentUser))))
 
 	// Health check

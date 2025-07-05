@@ -25,7 +25,7 @@ func RequestID(next http.Handler) http.Handler {
 
 		// Add to context
 		ctx := context.WithValue(r.Context(), "request_id", requestID)
-		
+
 		// Add to response header
 		w.Header().Set("X-Request-ID", requestID)
 
@@ -80,7 +80,7 @@ func Recover(next http.Handler) http.Handler {
 					}
 					return
 				}
-				
+
 				// Log the panic
 				requestID, _ := r.Context().Value("request_id").(string)
 				slog.Error("panic recovered",
@@ -109,7 +109,7 @@ func CORS(allowedOrigins []string, allowedMethods []string, allowedHeaders []str
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			
+
 			// Check if origin is allowed
 			if isOriginAllowed(origin, allowedOrigins) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -139,7 +139,7 @@ func Security(next http.Handler) http.Handler {
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';")
-		
+
 		// Add HSTS for HTTPS connections
 		if r.TLS != nil {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")

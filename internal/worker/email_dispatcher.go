@@ -33,11 +33,11 @@ type EmailDispatcher struct {
 
 // Config holds configuration for the email dispatcher
 type Config struct {
-	Workers      int
-	QueueSize    int
-	MaxRetries   int
-	RetryDelay   time.Duration
-	SendTimeout  time.Duration
+	Workers     int
+	QueueSize   int
+	MaxRetries  int
+	RetryDelay  time.Duration
+	SendTimeout time.Duration
 }
 
 // DefaultConfig returns default configuration
@@ -54,7 +54,7 @@ func DefaultConfig() Config {
 // NewEmailDispatcher creates a new email dispatcher
 func NewEmailDispatcher(emailService email.Service, config Config, logger *slog.Logger) *EmailDispatcher {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &EmailDispatcher{
 		emailService: emailService,
 		workers:      config.Workers,
@@ -83,20 +83,20 @@ func (d *EmailDispatcher) Start() {
 // Stop stops the email dispatcher and waits for workers to finish
 func (d *EmailDispatcher) Stop(timeout time.Duration) error {
 	d.logger.Info("stopping email dispatcher")
-	
+
 	// Signal workers to stop
 	d.cancel()
-	
+
 	// Close the job queue
 	close(d.jobQueue)
-	
+
 	// Wait for workers to finish with timeout
 	done := make(chan struct{})
 	go func() {
 		d.wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		d.logger.Info("email dispatcher stopped gracefully")
@@ -113,7 +113,7 @@ func (d *EmailDispatcher) Enqueue(email email.Email) error {
 		Email:     email,
 		CreatedAt: time.Now(),
 	}
-	
+
 	select {
 	case d.jobQueue <- job:
 		d.logger.Debug("email job enqueued",
@@ -134,7 +134,7 @@ func (d *EmailDispatcher) EnqueueWithContext(ctx context.Context, email email.Em
 		Email:     email,
 		CreatedAt: time.Now(),
 	}
-	
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -156,9 +156,9 @@ func (d *EmailDispatcher) QueueSize() int {
 // worker processes email jobs
 func (d *EmailDispatcher) worker(id int) {
 	defer d.wg.Done()
-	
+
 	d.logger.Debug("email worker started", "worker_id", id)
-	
+
 	for {
 		select {
 		case <-d.ctx.Done():
@@ -169,7 +169,7 @@ func (d *EmailDispatcher) worker(id int) {
 				d.logger.Debug("email worker stopping (queue closed)", "worker_id", id)
 				return
 			}
-			
+
 			d.processJob(id, job)
 		}
 	}
@@ -178,21 +178,21 @@ func (d *EmailDispatcher) worker(id int) {
 // processJob processes a single email job with retries
 func (d *EmailDispatcher) processJob(workerID int, job EmailJob) {
 	startTime := time.Now()
-	
+
 	d.logger.Debug("processing email job",
 		"worker_id", workerID,
 		"job_id", job.ID,
 		"to", job.Email.To,
 		"retries", job.Retries,
 	)
-	
+
 	// Create context with timeout for sending
 	ctx, cancel := context.WithTimeout(d.ctx, 30*time.Second)
 	defer cancel()
-	
+
 	// Try to send the email
 	err := d.emailService.Send(ctx, job.Email)
-	
+
 	if err == nil {
 		// Success
 		d.logger.Info("email sent successfully",
@@ -203,7 +203,7 @@ func (d *EmailDispatcher) processJob(workerID int, job EmailJob) {
 		)
 		return
 	}
-	
+
 	// Failed
 	d.logger.Error("failed to send email",
 		"worker_id", workerID,
@@ -212,18 +212,18 @@ func (d *EmailDispatcher) processJob(workerID int, job EmailJob) {
 		"error", err,
 		"retries", job.Retries,
 	)
-	
+
 	// Check if we should retry
 	if job.Retries < d.maxRetries {
 		job.Retries++
-		
+
 		// Wait before retry
 		select {
 		case <-d.ctx.Done():
 			return
 		case <-time.After(d.retryDelay * time.Duration(job.Retries)):
 		}
-		
+
 		// Re-enqueue the job
 		select {
 		case d.jobQueue <- job:

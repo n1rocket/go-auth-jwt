@@ -160,7 +160,7 @@ func handleSignup(ctx context.Context, authClient *client.Client, config *Config
 
 	fmt.Println("✓ Account created successfully!")
 	fmt.Println("Please check your email to verify your account.")
-	
+
 	// Save email for convenience
 	config.Email = email
 	saveConfig(config)
@@ -176,7 +176,7 @@ func handleLogin(ctx context.Context, authClient *client.Client, config *Config)
 			email = input
 		}
 	}
-	
+
 	password := promptPassword("Password: ")
 
 	fmt.Println("Logging in...")
@@ -191,13 +191,13 @@ func handleLogin(ctx context.Context, authClient *client.Client, config *Config)
 	}
 
 	fmt.Println("✓ Login successful!")
-	
+
 	// Save tokens and email
 	config.Email = email
 	config.AccessToken = authResp.AccessToken
 	config.RefreshToken = authResp.RefreshToken
 	saveConfig(config)
-	
+
 	// Show expiration time
 	expiresAt := time.Now().Add(time.Duration(authResp.ExpiresIn) * time.Second)
 	fmt.Printf("Token expires at: %s\n", expiresAt.Format(time.RFC3339))
@@ -218,7 +218,7 @@ func handleLogout(ctx context.Context, authClient *client.Client, config *Config
 	config.AccessToken = ""
 	config.RefreshToken = ""
 	saveConfig(config)
-	
+
 	fmt.Println("✓ Logged out successfully!")
 }
 
@@ -285,12 +285,12 @@ func handleRefresh(ctx context.Context, authClient *client.Client, config *Confi
 	}
 
 	fmt.Println("✓ Token refreshed successfully!")
-	
+
 	// Save new tokens
 	config.AccessToken = authResp.AccessToken
 	config.RefreshToken = authResp.RefreshToken
 	saveConfig(config)
-	
+
 	// Show new expiration time
 	expiresAt := time.Now().Add(time.Duration(authResp.ExpiresIn) * time.Second)
 	fmt.Printf("Token expires at: %s\n", expiresAt.Format(time.RFC3339))
@@ -366,13 +366,13 @@ func promptPassword(label string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	pwd := string(password)
 	if len(pwd) < 8 {
 		fmt.Println("Password must be at least 8 characters long.")
 		return promptPassword(label)
 	}
-	
+
 	return pwd
 }
 

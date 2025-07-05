@@ -243,4 +243,3 @@ func TestDB_WithTransactionIsolation_Panic(t *testing.T) {
 		panic("test panic")
 	})
 }
-

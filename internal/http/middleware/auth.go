@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	httpcontext "github.com/n1rocket/go-auth-jwt/internal/http/context"
 	"github.com/n1rocket/go-auth-jwt/internal/http/request"
 	"github.com/n1rocket/go-auth-jwt/internal/http/response"
-	"github.com/n1rocket/go-auth-jwt/internal/http/handlers"
 	"github.com/n1rocket/go-auth-jwt/internal/token"
 )
 
@@ -28,11 +28,11 @@ func RequireAuth(tokenManager *token.Manager, next http.Handler) http.Handler {
 		}
 
 		// Add user ID to context
-		ctx := handlers.WithUserID(r.Context(), claims.UserID)
-		
+		ctx := context.WithValue(r.Context(), httpcontext.UserIDKey, claims.UserID)
+
 		// Add additional claims to context if needed
-		ctx = context.WithValue(ctx, "email", claims.Email)
-		ctx = context.WithValue(ctx, "email_verified", claims.EmailVerified)
+		ctx = context.WithValue(ctx, httpcontext.UserEmailKey, claims.Email)
+		ctx = context.WithValue(ctx, httpcontext.UserEmailVerifiedKey, claims.EmailVerified)
 
 		// Call next handler with updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -59,11 +59,11 @@ func OptionalAuth(tokenManager *token.Manager, next http.Handler) http.Handler {
 		}
 
 		// Add user ID to context
-		ctx := handlers.WithUserID(r.Context(), claims.UserID)
-		
+		ctx := context.WithValue(r.Context(), httpcontext.UserIDKey, claims.UserID)
+
 		// Add additional claims to context
-		ctx = context.WithValue(ctx, "email", claims.Email)
-		ctx = context.WithValue(ctx, "email_verified", claims.EmailVerified)
+		ctx = context.WithValue(ctx, httpcontext.UserEmailKey, claims.Email)
+		ctx = context.WithValue(ctx, httpcontext.UserEmailVerifiedKey, claims.EmailVerified)
 
 		// Call next handler with updated context
 		next.ServeHTTP(w, r.WithContext(ctx))

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/n1rocket/go-auth-jwt/internal/domain"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/n1rocket/go-auth-jwt/internal/domain"
 )
 
 func TestNewUserRepository(t *testing.T) {
@@ -21,11 +21,11 @@ func TestNewUserRepository(t *testing.T) {
 	defer db.Close()
 
 	repo := NewUserRepository(db)
-	
+
 	if repo == nil {
 		t.Error("Expected repository to be created")
 	}
-	
+
 	if repo.db != db {
 		t.Error("Expected db to be set correctly")
 	}
@@ -33,13 +33,13 @@ func TestNewUserRepository(t *testing.T) {
 
 func TestUserRepository_Create(t *testing.T) {
 	fixedTime := time.Now()
-	
+
 	tests := []struct {
-		name    string
-		user    *domain.User
+		name      string
+		user      *domain.User
 		setupMock func(sqlmock.Sqlmock)
-		wantErr bool
-		errType error
+		wantErr   bool
+		errType   error
 	}{
 		{
 			name: "successful creation",
@@ -128,12 +128,12 @@ func TestUserRepository_Create(t *testing.T) {
 			name: "with email verification token",
 			user: &domain.User{
 				Email:                      "test@example.com",
-				PasswordHash:              "hashed_password",
-				EmailVerified:             false,
-				EmailVerificationToken:    stringPtr("verification-token"),
+				PasswordHash:               "hashed_password",
+				EmailVerified:              false,
+				EmailVerificationToken:     stringPtr("verification-token"),
 				EmailVerificationExpiresAt: timePtr(fixedTime.Add(24 * time.Hour)),
-				CreatedAt:                 fixedTime,
-				UpdatedAt:                 fixedTime,
+				CreatedAt:                  fixedTime,
+				UpdatedAt:                  fixedTime,
 			},
 			setupMock: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows([]string{"id"}).
@@ -144,7 +144,7 @@ func TestUserRepository_Create(t *testing.T) {
 						"hashed_password",
 						false,
 						"verification-token",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						nil,
 						nil,
 						fixedTime,
@@ -165,23 +165,23 @@ func TestUserRepository_Create(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &UserRepository{db: db}
 			err = repo.Create(context.Background(), tt.user)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("Create() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if !tt.wantErr && tt.user.ID == "" {
 				t.Error("Expected user ID to be set")
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -191,14 +191,14 @@ func TestUserRepository_Create(t *testing.T) {
 
 func TestUserRepository_GetByID(t *testing.T) {
 	fixedTime := time.Now()
-	
+
 	tests := []struct {
-		name    string
-		userID  string
+		name      string
+		userID    string
 		setupMock func(sqlmock.Sqlmock)
-		want    *domain.User
-		wantErr bool
-		errType error
+		want      *domain.User
+		wantErr   bool
+		errType   error
 	}{
 		{
 			name:   "successful retrieval",
@@ -260,25 +260,25 @@ func TestUserRepository_GetByID(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &UserRepository{db: db}
 			got, err := repo.GetByID(context.Background(), tt.userID)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetByID() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("GetByID() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if !tt.wantErr && got != nil {
 				if got.ID != tt.want.ID || got.Email != tt.want.Email {
 					t.Errorf("GetByID() = %v, want %v", got, tt.want)
 				}
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -288,14 +288,14 @@ func TestUserRepository_GetByID(t *testing.T) {
 
 func TestUserRepository_GetByEmail(t *testing.T) {
 	fixedTime := time.Now()
-	
+
 	tests := []struct {
-		name    string
-		email   string
+		name      string
+		email     string
 		setupMock func(sqlmock.Sqlmock)
-		want    *domain.User
-		wantErr bool
-		errType error
+		want      *domain.User
+		wantErr   bool
+		errType   error
 	}{
 		{
 			name:  "successful retrieval",
@@ -357,25 +357,25 @@ func TestUserRepository_GetByEmail(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &UserRepository{db: db}
 			got, err := repo.GetByEmail(context.Background(), tt.email)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetByEmail() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("GetByEmail() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if !tt.wantErr && got != nil {
 				if got.ID != tt.want.ID || got.Email != tt.want.Email {
 					t.Errorf("GetByEmail() = %v, want %v", got, tt.want)
 				}
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -384,13 +384,13 @@ func TestUserRepository_GetByEmail(t *testing.T) {
 }
 
 func TestUserRepository_Update(t *testing.T) {
-	
+
 	tests := []struct {
-		name    string
-		user    *domain.User
+		name      string
+		user      *domain.User
 		setupMock func(sqlmock.Sqlmock)
-		wantErr bool
-		errType error
+		wantErr   bool
+		errType   error
 	}{
 		{
 			name: "successful update",
@@ -420,9 +420,9 @@ func TestUserRepository_Update(t *testing.T) {
 		{
 			name: "user not found",
 			user: &domain.User{
-				ID:            "non-existent",
-				Email:         "test@example.com",
-				PasswordHash:  "hash",
+				ID:           "non-existent",
+				Email:        "test@example.com",
+				PasswordHash: "hash",
 			},
 			setupMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE users SET`)).
@@ -445,9 +445,9 @@ func TestUserRepository_Update(t *testing.T) {
 		{
 			name: "duplicate email",
 			user: &domain.User{
-				ID:            "user-123",
-				Email:         "existing@example.com",
-				PasswordHash:  "hash",
+				ID:           "user-123",
+				Email:        "existing@example.com",
+				PasswordHash: "hash",
 			},
 			setupMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE users SET`)).
@@ -472,9 +472,9 @@ func TestUserRepository_Update(t *testing.T) {
 		{
 			name: "rows affected error",
 			user: &domain.User{
-				ID:            "user-rows",
-				Email:         "test@example.com",
-				PasswordHash:  "hash",
+				ID:           "user-rows",
+				Email:        "test@example.com",
+				PasswordHash: "hash",
 			},
 			setupMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE users SET`)).
@@ -496,9 +496,9 @@ func TestUserRepository_Update(t *testing.T) {
 		{
 			name: "database error",
 			user: &domain.User{
-				ID:            "user-123",
-				Email:         "test@example.com",
-				PasswordHash:  "hash",
+				ID:           "user-123",
+				Email:        "test@example.com",
+				PasswordHash: "hash",
 			},
 			setupMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE users SET`)).
@@ -528,19 +528,19 @@ func TestUserRepository_Update(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &UserRepository{db: db}
 			err = repo.Update(context.Background(), tt.user)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("Update() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -550,11 +550,11 @@ func TestUserRepository_Update(t *testing.T) {
 
 func TestUserRepository_Delete(t *testing.T) {
 	tests := []struct {
-		name    string
-		userID  string
+		name      string
+		userID    string
 		setupMock func(sqlmock.Sqlmock)
-		wantErr bool
-		errType error
+		wantErr   bool
+		errType   error
 	}{
 		{
 			name:   "successful deletion",
@@ -608,19 +608,19 @@ func TestUserRepository_Delete(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &UserRepository{db: db}
 			err = repo.Delete(context.Background(), tt.userID)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("Delete() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -682,23 +682,22 @@ func TestUserRepository_ExistsByEmail(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &UserRepository{db: db}
 			exists, err := repo.ExistsByEmail(context.Background(), tt.email)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExistsByEmail() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if exists != tt.wantExist {
 				t.Errorf("ExistsByEmail() = %v, want %v", exists, tt.wantExist)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
 		})
 	}
 }
-

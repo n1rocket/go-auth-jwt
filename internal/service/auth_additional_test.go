@@ -47,7 +47,7 @@ func TestAuthService_Logout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := service.Logout(ctx, tt.refreshToken)
+			err := service.Logout(ctx, LogoutInput{RefreshToken: tt.refreshToken})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Logout() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -294,7 +294,7 @@ func TestAuthService_EdgeCases(t *testing.T) {
 			Email:    "alreadyverified@example.com",
 			Password: "password123",
 		})
-		
+
 		user, _ := userRepo.GetByEmail(ctx, "alreadyverified@example.com")
 		verifyToken := user.EmailVerificationToken
 

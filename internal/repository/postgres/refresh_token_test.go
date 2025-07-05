@@ -20,11 +20,11 @@ func TestNewRefreshTokenRepository(t *testing.T) {
 	defer db.Close()
 
 	repo := NewRefreshTokenRepository(db)
-	
+
 	if repo == nil {
 		t.Error("Expected repository to be created")
 	}
-	
+
 	if repo.db != db {
 		t.Error("Expected db to be set correctly")
 	}
@@ -32,12 +32,12 @@ func TestNewRefreshTokenRepository(t *testing.T) {
 
 func TestRefreshTokenRepository_Create(t *testing.T) {
 	fixedTime := time.Now()
-	
+
 	tests := []struct {
-		name    string
-		token   *domain.RefreshToken
+		name      string
+		token     *domain.RefreshToken
 		setupMock func(sqlmock.Sqlmock)
-		wantErr bool
+		wantErr   bool
 	}{
 		{
 			name: "successful creation",
@@ -54,7 +54,7 @@ func TestRefreshTokenRepository_Create(t *testing.T) {
 				mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO refresh_tokens`)).
 					WithArgs(
 						"user-123",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						false,
 						nil,
 						nil,
@@ -83,7 +83,7 @@ func TestRefreshTokenRepository_Create(t *testing.T) {
 				mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO refresh_tokens`)).
 					WithArgs(
 						"user-123",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						false,
 						nil,
 						"Mozilla/5.0",
@@ -108,7 +108,7 @@ func TestRefreshTokenRepository_Create(t *testing.T) {
 				mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO refresh_tokens`)).
 					WithArgs(
 						"user-123",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						false,
 						nil,
 						nil,
@@ -131,19 +131,19 @@ func TestRefreshTokenRepository_Create(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			err = repo.Create(context.Background(), tt.token)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr && tt.token.Token == "" {
 				t.Error("Expected token to be set")
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -154,7 +154,7 @@ func TestRefreshTokenRepository_Create(t *testing.T) {
 func TestRefreshTokenRepository_GetByToken(t *testing.T) {
 	fixedTime := time.Now()
 	revokedTime := time.Now().Add(-1 * time.Hour)
-	
+
 	tests := []struct {
 		name       string
 		tokenValue string
@@ -248,25 +248,25 @@ func TestRefreshTokenRepository_GetByToken(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			got, err := repo.GetByToken(context.Background(), tt.tokenValue)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetByToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("GetByToken() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if !tt.wantErr && got != nil {
 				if got.Token != tt.want.Token || got.UserID != tt.want.UserID {
 					t.Errorf("GetByToken() = %v, want %v", got, tt.want)
 				}
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -276,7 +276,7 @@ func TestRefreshTokenRepository_GetByToken(t *testing.T) {
 
 func TestRefreshTokenRepository_GetByUserID(t *testing.T) {
 	fixedTime := time.Now()
-	
+
 	tests := []struct {
 		name      string
 		userID    string
@@ -294,7 +294,7 @@ func TestRefreshTokenRepository_GetByUserID(t *testing.T) {
 				}).
 					AddRow("token-1", "user-123", fixedTime.Add(24*time.Hour), false, nil, nil, nil, fixedTime, fixedTime).
 					AddRow("token-2", "user-123", fixedTime.Add(48*time.Hour), false, nil, nil, nil, fixedTime.Add(-1*time.Hour), fixedTime.Add(-1*time.Hour))
-				
+
 				mock.ExpectQuery(regexp.QuoteMeta(`SELECT token, user_id, expires_at`)).
 					WithArgs("user-123").
 					WillReturnRows(rows)
@@ -310,7 +310,7 @@ func TestRefreshTokenRepository_GetByUserID(t *testing.T) {
 					"token", "user_id", "expires_at", "revoked", "revoked_at",
 					"user_agent", "ip_address", "created_at", "last_used_at",
 				})
-				
+
 				mock.ExpectQuery(regexp.QuoteMeta(`SELECT token, user_id, expires_at`)).
 					WithArgs("user-456").
 					WillReturnRows(rows)
@@ -338,7 +338,7 @@ func TestRefreshTokenRepository_GetByUserID(t *testing.T) {
 					"user_agent", "ip_address", "created_at", "last_used_at",
 				}).
 					AddRow("token-1", "user-scan", "invalid-time", false, nil, nil, nil, fixedTime, fixedTime) // invalid time will cause scan error
-				
+
 				mock.ExpectQuery(regexp.QuoteMeta(`SELECT token, user_id, expires_at`)).
 					WithArgs("user-scan").
 					WillReturnRows(rows)
@@ -356,7 +356,7 @@ func TestRefreshTokenRepository_GetByUserID(t *testing.T) {
 				}).
 					AddRow("token-1", "user-rows-err", fixedTime.Add(24*time.Hour), false, nil, nil, nil, fixedTime, fixedTime).
 					RowError(0, errors.New("row error"))
-				
+
 				mock.ExpectQuery(regexp.QuoteMeta(`SELECT token, user_id, expires_at`)).
 					WithArgs("user-rows-err").
 					WillReturnRows(rows)
@@ -375,19 +375,19 @@ func TestRefreshTokenRepository_GetByUserID(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			got, err := repo.GetByUserID(context.Background(), tt.userID)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetByUserID() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr && len(got) != tt.want {
 				t.Errorf("GetByUserID() returned %d tokens, want %d", len(got), tt.want)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -397,7 +397,7 @@ func TestRefreshTokenRepository_GetByUserID(t *testing.T) {
 
 func TestRefreshTokenRepository_Update(t *testing.T) {
 	fixedTime := time.Now()
-	
+
 	tests := []struct {
 		name      string
 		token     *domain.RefreshToken
@@ -417,7 +417,7 @@ func TestRefreshTokenRepository_Update(t *testing.T) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE refresh_tokens SET`)).
 					WithArgs(
 						"token-123",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						false,
 						nil,
 						fixedTime,
@@ -439,7 +439,7 @@ func TestRefreshTokenRepository_Update(t *testing.T) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE refresh_tokens SET`)).
 					WithArgs(
 						"token-123",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						true,
 						fixedTime,
 						fixedTime,
@@ -460,7 +460,7 @@ func TestRefreshTokenRepository_Update(t *testing.T) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE refresh_tokens SET`)).
 					WithArgs(
 						"non-existent",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						false,
 						nil,
 						fixedTime,
@@ -482,7 +482,7 @@ func TestRefreshTokenRepository_Update(t *testing.T) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE refresh_tokens SET`)).
 					WithArgs(
 						"token-rows",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						false,
 						nil,
 						fixedTime,
@@ -503,7 +503,7 @@ func TestRefreshTokenRepository_Update(t *testing.T) {
 				mock.ExpectExec(regexp.QuoteMeta(`UPDATE refresh_tokens SET`)).
 					WithArgs(
 						"token-123",
-						fixedTime.Add(24 * time.Hour),
+						fixedTime.Add(24*time.Hour),
 						false,
 						nil,
 						fixedTime,
@@ -523,19 +523,19 @@ func TestRefreshTokenRepository_Update(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			err = repo.Update(context.Background(), tt.token)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("Update() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -603,19 +603,19 @@ func TestRefreshTokenRepository_Revoke(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			err = repo.Revoke(context.Background(), tt.tokenValue)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Revoke() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("Revoke() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -671,14 +671,14 @@ func TestRefreshTokenRepository_RevokeAllForUser(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			err = repo.RevokeAllForUser(context.Background(), tt.userID)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RevokeAllForUser() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -730,14 +730,14 @@ func TestRefreshTokenRepository_DeleteExpired(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			err = repo.DeleteExpired(context.Background())
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteExpired() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
@@ -805,23 +805,22 @@ func TestRefreshTokenRepository_DeleteByToken(t *testing.T) {
 			defer db.Close()
 
 			tt.setupMock(mock)
-			
+
 			repo := &RefreshTokenRepository{db: db}
 			err = repo.DeleteByToken(context.Background(), tt.tokenValue)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteByToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.errType != nil && !errors.Is(err, tt.errType) {
 				t.Errorf("DeleteByToken() error = %v, want %v", err, tt.errType)
 			}
-			
+
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %s", err)
 			}
 		})
 	}
 }
-

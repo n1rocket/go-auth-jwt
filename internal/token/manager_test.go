@@ -57,7 +57,7 @@ func TestNewManager_RS256(t *testing.T) {
 
 	// Generate test keys
 	generateTestKeys(t, privateKeyPath, publicKeyPath)
-	
+
 	// Create invalid key files
 	os.WriteFile(invalidPrivateKeyPath, []byte("invalid private key content"), 0644)
 	os.WriteFile(invalidPublicKeyPath, []byte("invalid public key content"), 0644)
@@ -305,7 +305,7 @@ func TestManager_ValidateAccessToken_InvalidToken(t *testing.T) {
 		"exp":     time.Now().Add(1 * time.Hour).Unix(),
 	})
 	tokenString, _ := token.SignedString([]byte("test-secret"))
-	
+
 	// Manually create invalid token by modifying the valid one
 	// JWT tokens have 3 parts separated by dots
 	parts := strings.Split(tokenString, ".")
@@ -323,7 +323,7 @@ func TestManager_GenerateAccessToken_UnsupportedAlgorithm(t *testing.T) {
 	// Create a manager with an unsupported algorithm by modifying it after creation
 	manager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
 	manager.algorithm = "UNSUPPORTED"
-	
+
 	_, err := manager.GenerateAccessToken("user-123", "test@example.com", true)
 	if err == nil {
 		t.Error("GenerateAccessToken() should return error for unsupported algorithm")
@@ -334,12 +334,12 @@ func TestManager_SigningAndVerificationKeys(t *testing.T) {
 	// Test getSigningKey and getVerificationKey with unsupported algorithm
 	manager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
 	manager.algorithm = "UNSUPPORTED"
-	
+
 	signingKey := manager.getSigningKey()
 	if signingKey != nil {
 		t.Error("getSigningKey() should return nil for unsupported algorithm")
 	}
-	
+
 	verificationKey := manager.getVerificationKey()
 	if verificationKey != nil {
 		t.Error("getVerificationKey() should return nil for unsupported algorithm")
@@ -350,11 +350,11 @@ func TestManager_ValidateAccessToken_UnsupportedAlgorithm(t *testing.T) {
 	// Create a valid token first
 	validManager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
 	tokenString, _ := validManager.GenerateAccessToken("user-123", "test@example.com", true)
-	
+
 	// Create a manager with unsupported algorithm
 	invalidManager, _ := NewManager("HS256", "test-secret", "", "", "test-issuer", 15*time.Minute)
 	invalidManager.algorithm = "UNSUPPORTED"
-	
+
 	_, err := invalidManager.ValidateAccessToken(tokenString)
 	if err == nil {
 		t.Error("ValidateAccessToken() should return error for unsupported algorithm")
@@ -407,7 +407,7 @@ func TestManager_GetJWKS(t *testing.T) {
 	if jwks == nil {
 		t.Error("GetJWKS() returned nil")
 	}
-	
+
 	// Check JWKS structure
 	keys, ok := jwks["keys"].([]map[string]interface{})
 	if !ok || len(keys) == 0 {

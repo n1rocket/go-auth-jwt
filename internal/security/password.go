@@ -121,18 +121,18 @@ func ValidatePasswordStrength(password string) error {
 	// For now, just require minimum length
 	// You can uncomment below to enforce stronger requirements
 	/*
-	if !hasUpper {
-		return fmt.Errorf("password must contain at least one uppercase letter")
-	}
-	if !hasLower {
-		return fmt.Errorf("password must contain at least one lowercase letter")
-	}
-	if !hasNumber {
-		return fmt.Errorf("password must contain at least one number")
-	}
-	if !hasSpecial {
-		return fmt.Errorf("password must contain at least one special character")
-	}
+		if !hasUpper {
+			return fmt.Errorf("password must contain at least one uppercase letter")
+		}
+		if !hasLower {
+			return fmt.Errorf("password must contain at least one lowercase letter")
+		}
+		if !hasNumber {
+			return fmt.Errorf("password must contain at least one number")
+		}
+		if !hasSpecial {
+			return fmt.Errorf("password must contain at least one special character")
+		}
 	*/
 
 	// Store these for potential future use

@@ -34,7 +34,7 @@ func NewSMTPService(config SMTPConfig, logger *slog.Logger) *SMTPService {
 	if config.Timeout == 0 {
 		config.Timeout = 30 * time.Second
 	}
-	
+
 	return &SMTPService{
 		config: config,
 		logger: logger,
@@ -49,55 +49,25 @@ func (s *SMTPService) Send(ctx context.Context, email Email) error {
 		deadline = time.Now().Add(s.config.Timeout)
 	}
 
-	// Prepare email headers and body
-	from := s.formatAddress(s.config.FromAddress, s.config.FromName)
-	to := email.To
-	
-	// Build email message
-	var message strings.Builder
-	message.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	message.WriteString(fmt.Sprintf("To: %s\r\n", to))
-	message.WriteString(fmt.Sprintf("Subject: %s\r\n", email.Subject))
-	message.WriteString("MIME-Version: 1.0\r\n")
-	
-	// If we have HTML body, send multipart email
-	if email.HTMLBody != "" {
-		boundary := "boundary-" + fmt.Sprintf("%d", time.Now().UnixNano())
-		message.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary))
-		message.WriteString("\r\n")
-		
-		// Plain text part
-		message.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-		message.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-		message.WriteString("\r\n")
-		message.WriteString(email.Body)
-		message.WriteString("\r\n")
-		
-		// HTML part
-		message.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-		message.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
-		message.WriteString("\r\n")
-		message.WriteString(email.HTMLBody)
-		message.WriteString("\r\n")
-		
-		// End boundary
-		message.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
-	} else {
-		// Plain text only
-		message.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-		message.WriteString("\r\n")
-		message.WriteString(email.Body)
-	}
+	// Build email message using MessageBuilder
+	from := FormatAddress(s.config.FromAddress, s.config.FromName)
+	messageStr := NewMessageBuilder().
+		From(from).
+		To(email.To).
+		Subject(email.Subject).
+		TextBody(email.Body).
+		HTMLBody(email.HTMLBody).
+		Build()
 
 	// Connect to SMTP server with timeout
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
-	
+
 	// Create dialer with timeout
 	dialer := &net.Dialer{
 		Timeout:  time.Until(deadline),
 		Deadline: deadline,
 	}
-	
+
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to SMTP server: %w", err)
@@ -120,7 +90,7 @@ func (s *SMTPService) Send(ctx context.Context, email Email) error {
 			ServerName: s.config.Host,
 			MinVersion: tls.VersionTLS12,
 		}
-		
+
 		if err := client.StartTLS(tlsConfig); err != nil {
 			return fmt.Errorf("failed to start TLS: %w", err)
 		}
@@ -140,7 +110,7 @@ func (s *SMTPService) Send(ctx context.Context, email Email) error {
 	}
 
 	// Set recipient
-	if err := client.Rcpt(to); err != nil {
+	if err := client.Rcpt(email.To); err != nil {
 		return fmt.Errorf("failed to set recipient: %w", err)
 	}
 
@@ -150,7 +120,7 @@ func (s *SMTPService) Send(ctx context.Context, email Email) error {
 		return fmt.Errorf("failed to get data writer: %w", err)
 	}
 
-	_, err = writer.Write([]byte(message.String()))
+	_, err = writer.Write([]byte(messageStr))
 	if err != nil {
 		writer.Close()
 		return fmt.Errorf("failed to write email data: %w", err)
@@ -165,19 +135,11 @@ func (s *SMTPService) Send(ctx context.Context, email Email) error {
 
 	// Log successful send
 	s.logger.Info("email sent successfully",
-		"to", to,
+		"to", email.To,
 		"subject", email.Subject,
 	)
 
 	return nil
-}
-
-// formatAddress formats an email address with optional name
-func (s *SMTPService) formatAddress(email, name string) string {
-	if name == "" {
-		return email
-	}
-	return fmt.Sprintf("%s <%s>", name, email)
 }
 
 // ValidateSMTPConfig validates SMTP configuration
@@ -185,36 +147,36 @@ func ValidateSMTPConfig(config SMTPConfig) error {
 	if config.Host == "" {
 		return fmt.Errorf("SMTP host is required")
 	}
-	
+
 	if config.Port <= 0 || config.Port > 65535 {
 		return fmt.Errorf("invalid SMTP port: %d", config.Port)
 	}
-	
+
 	if config.FromAddress == "" {
 		return fmt.Errorf("from address is required")
 	}
-	
+
 	// Validate email format
 	if !strings.Contains(config.FromAddress, "@") {
 		return fmt.Errorf("invalid from address format")
 	}
-	
+
 	// Common SMTP ports
 	validPorts := map[int]bool{
-		25:  true, // SMTP
-		465: true, // SMTPS
-		587: true, // SMTP with STARTTLS
+		25:   true, // SMTP
+		465:  true, // SMTPS
+		587:  true, // SMTP with STARTTLS
 		2525: true, // Alternative SMTP
 	}
-	
+
 	if !validPorts[config.Port] {
 		slog.Warn("using non-standard SMTP port", "port", config.Port)
 	}
-	
+
 	// TLS should be enabled for common secure ports
 	if (config.Port == 465 || config.Port == 587) && !config.TLSEnabled {
 		slog.Warn("TLS is disabled for secure SMTP port", "port", config.Port)
 	}
-	
+
 	return nil
 }

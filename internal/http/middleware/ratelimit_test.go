@@ -218,10 +218,10 @@ func TestKeyFunctions(t *testing.T) {
 		keyFunc := IPKeyFunc()
 
 		tests := []struct {
-			name     string
-			headers  map[string]string
+			name       string
+			headers    map[string]string
 			remoteAddr string
-			expected string
+			expected   string
 		}{
 			{
 				name:       "RemoteAddr only",
@@ -291,7 +291,7 @@ func WithUserID(ctx context.Context, userID string) context.Context {
 
 func TestPathKeyFunc(t *testing.T) {
 	keyFunc := PathKeyFunc()
-	
+
 	tests := []struct {
 		name       string
 		path       string
@@ -317,7 +317,7 @@ func TestPathKeyFunc(t *testing.T) {
 			expected:   "192.0.2.1:/",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", tt.path, nil)
@@ -332,7 +332,7 @@ func TestPathKeyFunc(t *testing.T) {
 
 func TestDefaultRateLimitConfig(t *testing.T) {
 	config := DefaultRateLimitConfig()
-	
+
 	if config.Rate != 100 {
 		t.Errorf("Expected rate 100, got %d", config.Rate)
 	}
@@ -355,7 +355,7 @@ func TestRateLimiterCleanup(t *testing.T) {
 		Window:  time.Second,
 		KeyFunc: IPKeyFunc(),
 	}
-	
+
 	// Create limiter without starting the cleanup goroutine
 	limiter := &RateLimiter{
 		buckets: make(map[string]*TokenBucket),
@@ -365,16 +365,16 @@ func TestRateLimiterCleanup(t *testing.T) {
 		keyFunc: config.KeyFunc,
 		logger:  logger,
 	}
-	
+
 	// Add some buckets
 	limiter.Allow("key1")
 	limiter.Allow("key2")
 	limiter.Allow("key3")
-	
+
 	// Manually set old lastFill times for testing
 	now := time.Now()
 	oldTime := now.Add(-3 * config.Window) // Older than 2x window
-	
+
 	limiter.mu.Lock()
 	for key, bucket := range limiter.buckets {
 		if key == "key1" {
@@ -384,7 +384,7 @@ func TestRateLimiterCleanup(t *testing.T) {
 		}
 	}
 	limiter.mu.Unlock()
-	
+
 	// Manually trigger cleanup logic
 	limiter.mu.Lock()
 	for key, bucket := range limiter.buckets {
@@ -396,22 +396,22 @@ func TestRateLimiterCleanup(t *testing.T) {
 		bucket.mu.Unlock()
 	}
 	limiter.mu.Unlock()
-	
+
 	// Check that old bucket was removed
 	limiter.mu.RLock()
 	_, exists := limiter.buckets["key1"]
 	limiter.mu.RUnlock()
-	
+
 	if exists {
 		t.Error("Expected old bucket to be cleaned up")
 	}
-	
+
 	// Check that recent buckets still exist
 	limiter.mu.RLock()
 	_, exists2 := limiter.buckets["key2"]
 	_, exists3 := limiter.buckets["key3"]
 	limiter.mu.RUnlock()
-	
+
 	if !exists2 || !exists3 {
 		t.Error("Expected recent buckets to remain")
 	}
@@ -468,7 +468,7 @@ func TestGetClientIP(t *testing.T) {
 			expected:   "10.0.0.1",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
@@ -476,7 +476,7 @@ func TestGetClientIP(t *testing.T) {
 			for k, v := range tt.headers {
 				req.Header.Set(k, v)
 			}
-			
+
 			ip := getClientIP(req)
 			if ip != tt.expected {
 				t.Errorf("Expected IP %s, got %s", tt.expected, ip)

@@ -10,23 +10,23 @@ import (
 
 func TestDefaultSecurityConfig(t *testing.T) {
 	config := DefaultSecurityConfig()
-	
+
 	if config.XContentTypeOptions != "nosniff" {
 		t.Errorf("Expected X-Content-Type-Options = nosniff, got %s", config.XContentTypeOptions)
 	}
-	
+
 	if config.XFrameOptions != "DENY" {
 		t.Errorf("Expected X-Frame-Options = DENY, got %s", config.XFrameOptions)
 	}
-	
+
 	if config.XSSProtection != "1; mode=block" {
 		t.Errorf("Expected X-XSS-Protection = 1; mode=block, got %s", config.XSSProtection)
 	}
-	
+
 	if config.ReferrerPolicy != "strict-origin-when-cross-origin" {
 		t.Errorf("Expected Referrer-Policy = strict-origin-when-cross-origin, got %s", config.ReferrerPolicy)
 	}
-	
+
 	if !config.ForceHTTPS {
 		t.Error("Expected ForceHTTPS to be true")
 	}
@@ -34,23 +34,23 @@ func TestDefaultSecurityConfig(t *testing.T) {
 
 func TestStrictSecurityConfig(t *testing.T) {
 	config := StrictSecurityConfig()
-	
+
 	if config.StrictTransportSecurity != "max-age=31536000; includeSubDomains" {
 		t.Errorf("Unexpected Strict-Transport-Security: %s", config.StrictTransportSecurity)
 	}
-	
+
 	if config.ContentSecurityPolicy == "" {
 		t.Error("Expected ContentSecurityPolicy to be set")
 	}
-	
+
 	if !strings.Contains(config.ContentSecurityPolicy, "default-src 'self'") {
 		t.Error("Expected CSP to contain default-src 'self'")
 	}
-	
+
 	if config.ReferrerPolicy != "no-referrer" {
 		t.Errorf("Expected Referrer-Policy = no-referrer, got %s", config.ReferrerPolicy)
 	}
-	
+
 	if !config.ForceHTTPS {
 		t.Error("Expected ForceHTTPS to be true")
 	}
@@ -58,19 +58,19 @@ func TestStrictSecurityConfig(t *testing.T) {
 
 func TestAPISecurityConfig(t *testing.T) {
 	config := APISecurityConfig()
-	
+
 	if config.XContentTypeOptions != "nosniff" {
 		t.Errorf("Expected X-Content-Type-Options = nosniff, got %s", config.XContentTypeOptions)
 	}
-	
+
 	if config.XFrameOptions != "DENY" {
 		t.Errorf("Expected X-Frame-Options = DENY, got %s", config.XFrameOptions)
 	}
-	
+
 	if config.ContentSecurityPolicy != "" {
 		t.Error("Expected no CSP for API config")
 	}
-	
+
 	if config.ForceHTTPS {
 		t.Error("Expected ForceHTTPS to be false for API")
 	}
@@ -100,10 +100,10 @@ func TestSecurityHeaders(t *testing.T) {
 			config: StrictSecurityConfig(),
 			scheme: "https",
 			expectedHeaders: map[string]string{
-				"X-Content-Type-Options":   "nosniff",
-				"X-Frame-Options":          "DENY",
+				"X-Content-Type-Options":    "nosniff",
+				"X-Frame-Options":           "DENY",
 				"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-				"Referrer-Policy":          "no-referrer",
+				"Referrer-Policy":           "no-referrer",
 			},
 		},
 		{
@@ -145,7 +145,7 @@ func TestSecurityHeaders(t *testing.T) {
 			config: SecurityConfig{
 				XContentTypeOptions: "nosniff",
 				XFrameOptions:       "", // Empty, should not be set
-				XSSProtection:      "1",
+				XSSProtection:       "1",
 			},
 			scheme: "https",
 			expectedHeaders: map[string]string{
@@ -155,27 +155,26 @@ func TestSecurityHeaders(t *testing.T) {
 			notExpected: []string{"X-Frame-Options"},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte("OK"))
 			})
-			
+
 			securityMiddleware := SecurityHeaders(tt.config)
 			wrappedHandler := securityMiddleware(handler)
-			
+
 			req := httptest.NewRequest("GET", "http://example.com/test", nil)
 			if tt.scheme == "https" {
 				req.URL.Scheme = "https"
 				req.TLS = &tls.ConnectionState{} // Mock TLS
 			}
-			
-			
+
 			w := httptest.NewRecorder()
 			wrappedHandler.ServeHTTP(w, req)
-			
+
 			// Check force HTTPS redirect
 			if tt.config.ForceHTTPS && tt.scheme == "http" {
 				if w.Code != http.StatusMovedPermanently {
@@ -187,7 +186,7 @@ func TestSecurityHeaders(t *testing.T) {
 				}
 				return
 			}
-			
+
 			// Check expected headers
 			for header, expectedValue := range tt.expectedHeaders {
 				actualValue := w.Header().Get(header)
@@ -195,7 +194,7 @@ func TestSecurityHeaders(t *testing.T) {
 					t.Errorf("Expected header %s = %s, got %s", header, expectedValue, actualValue)
 				}
 			}
-			
+
 			// Check not expected headers
 			for _, header := range tt.notExpected {
 				if value := w.Header().Get(header); value != "" {
@@ -286,18 +285,18 @@ func TestCSPBuilder(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			csp := tt.build()
-			
+
 			// Check that all expected directives are present
 			for _, directive := range tt.expected {
 				if !strings.Contains(csp, directive) {
 					t.Errorf("Expected CSP to contain '%s', got: %s", directive, csp)
 				}
 			}
-			
+
 			// Check format (directives should be separated by semicolons)
 			parts := strings.Split(csp, ";")
 			expectedParts := len(tt.expected)
@@ -316,7 +315,7 @@ func TestSecurityHeadersIntegration(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
-	
+
 	config := SecurityConfig{
 		XContentTypeOptions: "nosniff",
 		XFrameOptions:       "SAMEORIGIN",
@@ -324,26 +323,25 @@ func TestSecurityHeadersIntegration(t *testing.T) {
 			"X-Custom-Middleware": "from-middleware",
 		},
 	}
-	
+
 	securityMiddleware := SecurityHeaders(config)
 	wrappedHandler := securityMiddleware(handler)
-	
+
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
-	
+
 	wrappedHandler.ServeHTTP(w, req)
-	
+
 	// Check that both middleware and handler headers are set
 	if w.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Error("Security header not set")
 	}
-	
+
 	if w.Header().Get("X-Custom-Middleware") != "from-middleware" {
 		t.Error("Custom middleware header not set")
 	}
-	
+
 	if w.Header().Get("X-Custom") != "from-handler" {
 		t.Error("Handler header not set")
 	}
 }
-

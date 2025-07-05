@@ -46,7 +46,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 
 	// Initialize security components
 	passwordHasher := security.NewDefaultPasswordHasher()
-	
+
 	tokenManager, err := token.NewManager(
 		cfg.JWT.Algorithm,
 		cfg.JWT.Secret,

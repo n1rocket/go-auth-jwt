@@ -36,7 +36,7 @@ func TestSignupRequest_JSONSerialization(t *testing.T) {
 
 func TestLoginRequest_JSONSerialization(t *testing.T) {
 	jsonStr := `{"email":"user@example.com","password":"secret123"}`
-	
+
 	var req handlers.LoginRequest
 	err := json.Unmarshal([]byte(jsonStr), &req)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestLoginRequest_JSONSerialization(t *testing.T) {
 
 func TestRefreshRequest_JSONSerialization(t *testing.T) {
 	jsonStr := `{"refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"}`
-	
+
 	var req handlers.RefreshRequest
 	err := json.Unmarshal([]byte(jsonStr), &req)
 	if err != nil {
@@ -67,7 +67,7 @@ func TestRefreshRequest_JSONSerialization(t *testing.T) {
 
 func TestLogoutRequest_JSONSerialization(t *testing.T) {
 	jsonStr := `{"refresh_token":"logout-token"}`
-	
+
 	var req handlers.LogoutRequest
 	err := json.Unmarshal([]byte(jsonStr), &req)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestLogoutRequest_JSONSerialization(t *testing.T) {
 
 func TestVerifyEmailRequest_JSONSerialization(t *testing.T) {
 	jsonStr := `{"email":"verify@example.com","token":"verification-token-123"}`
-	
+
 	var req handlers.VerifyEmailRequest
 	err := json.Unmarshal([]byte(jsonStr), &req)
 	if err != nil {

@@ -7,10 +7,10 @@ import (
 
 // mockDB implements DBTX interface for testing
 type mockDB struct {
-	execFunc       func(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	prepareFunc    func(ctx context.Context, query string) (*sql.Stmt, error)
-	queryFunc      func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	queryRowFunc   func(ctx context.Context, query string, args ...interface{}) *sql.Row
+	execFunc     func(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	prepareFunc  func(ctx context.Context, query string) (*sql.Stmt, error)
+	queryFunc    func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	queryRowFunc func(ctx context.Context, query string, args ...interface{}) *sql.Row
 }
 
 func (m *mockDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {

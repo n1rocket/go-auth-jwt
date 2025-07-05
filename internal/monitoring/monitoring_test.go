@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 	"time"
-	
+
 	"github.com/n1rocket/go-auth-jwt/internal/metrics"
 )
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	if !config.MetricsEnabled {
 		t.Error("Expected metrics to be enabled by default")
 	}
@@ -46,9 +46,9 @@ func TestDefaultConfig(t *testing.T) {
 func TestNewMonitor(t *testing.T) {
 	config := DefaultConfig()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	
+
 	monitor := NewMonitor(config, logger)
-	
+
 	if monitor == nil {
 		t.Fatal("Expected monitor to be created")
 	}
@@ -70,7 +70,7 @@ func TestMonitor_Metrics(t *testing.T) {
 	config := DefaultConfig()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	monitor := NewMonitor(config, logger)
-	
+
 	metrics := monitor.Metrics()
 	if metrics == nil {
 		t.Error("Expected metrics to be returned")
@@ -81,18 +81,18 @@ func TestMonitor_SetReady(t *testing.T) {
 	config := DefaultConfig()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	monitor := NewMonitor(config, logger)
-	
+
 	// Initially not ready
 	if monitor.ready {
 		t.Error("Expected monitor to not be ready initially")
 	}
-	
+
 	// Set ready
 	monitor.SetReady(true)
 	if !monitor.ready {
 		t.Error("Expected monitor to be ready after SetReady(true)")
 	}
-	
+
 	// Set not ready
 	monitor.SetReady(false)
 	if monitor.ready {
@@ -105,32 +105,32 @@ func TestMonitor_StartStop(t *testing.T) {
 	config.MetricsPort = 9999 // Use a different port to avoid conflicts
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	monitor := NewMonitor(config, logger)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Start monitor in goroutine
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- monitor.Start(ctx)
 	}()
-	
+
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Test that server is running
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d%s", config.MetricsPort, config.HealthPath))
 	if err != nil {
 		t.Fatalf("Failed to reach health endpoint: %v", err)
 	}
 	resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected 200 OK, got %d", resp.StatusCode)
 	}
-	
+
 	// Stop monitor
 	cancel()
-	
+
 	// Check for errors
 	select {
 	case err := <-errCh:
@@ -147,10 +147,10 @@ func TestMonitor_StartDisabled(t *testing.T) {
 	config.MetricsEnabled = false
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	monitor := NewMonitor(config, logger)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	err := monitor.Start(ctx)
 	if err != nil {
 		t.Errorf("Expected no error when metrics disabled, got %v", err)
@@ -161,30 +161,30 @@ func TestMonitor_HealthHandler(t *testing.T) {
 	config := DefaultConfig()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	monitor := NewMonitor(config, logger)
-	
+
 	// Create test request
 	req, err := http.NewRequest("GET", "/health", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create response recorder
 	rr := httptest.NewRecorder()
-	
+
 	// Call handler
 	monitor.healthHandler(rr, req)
-	
+
 	// Check status code
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
-	
+
 	// Check content type
 	expected := "application/json"
 	if ct := rr.Header().Get("Content-Type"); ct != expected {
 		t.Errorf("Handler returned wrong content type: got %v want %v", ct, expected)
 	}
-	
+
 	// Check response body
 	body := rr.Body.String()
 	if !strings.Contains(body, `"status":"ok"`) {
@@ -199,7 +199,7 @@ func TestMonitor_ReadyHandler(t *testing.T) {
 	config := DefaultConfig()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	monitor := NewMonitor(config, logger)
-	
+
 	tests := []struct {
 		name           string
 		ready          bool
@@ -219,23 +219,23 @@ func TestMonitor_ReadyHandler(t *testing.T) {
 			expectedBody:   `"status":"ready"`,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			monitor.SetReady(tt.ready)
-			
+
 			req, err := http.NewRequest("GET", "/ready", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			
+
 			rr := httptest.NewRecorder()
 			monitor.readyHandler(rr, req)
-			
+
 			if status := rr.Code; status != tt.expectedStatus {
 				t.Errorf("Handler returned wrong status code: got %v want %v", status, tt.expectedStatus)
 			}
-			
+
 			body := rr.Body.String()
 			if !strings.Contains(body, tt.expectedBody) {
 				t.Errorf("Handler returned unexpected body: %s", body)
@@ -259,14 +259,14 @@ func TestChecksToJSON(t *testing.T) {
 			Latency: 100 * time.Millisecond,
 		},
 	}
-	
+
 	result := checksToJSON(checks)
-	
+
 	// Verify JSON structure
 	if !strings.HasPrefix(result, "[") || !strings.HasSuffix(result, "]") {
 		t.Error("Expected JSON array format")
 	}
-	
+
 	// Verify content
 	if !strings.Contains(result, `"name":"database"`) {
 		t.Error("Expected database check in JSON")
@@ -284,11 +284,11 @@ func TestChecksToJSON(t *testing.T) {
 
 func TestGetHostname(t *testing.T) {
 	hostname := GetHostname()
-	
+
 	if hostname == "" {
 		t.Error("Expected hostname to be non-empty")
 	}
-	
+
 	// Verify it matches system hostname (if possible)
 	expected, err := os.Hostname()
 	if err == nil && hostname != expected {
@@ -299,9 +299,9 @@ func TestGetHostname(t *testing.T) {
 func TestNewCollector(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	metrics := metrics.NewMetrics()
-	
+
 	collector := NewCollector(metrics, logger)
-	
+
 	if collector == nil {
 		t.Fatal("Expected collector to be created")
 	}
@@ -317,19 +317,19 @@ func TestCollector_RecordHTTPRequest(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	m := metrics.NewMetrics()
 	collector := NewCollector(m, logger)
-	
+
 	// Record normal request
 	collector.RecordHTTPRequest("GET", "/api/users", "200", 100*time.Millisecond, 1024)
-	
+
 	// Verify metrics were recorded
-	if v, ok := m.RequestsTotal.Value().(int64); !ok || v != 1 {
+	if v, ok := m.RequestsTotal().Value().(int64); !ok || v != 1 {
 		t.Error("Expected request to be counted")
 	}
-	
+
 	// Record slow request (should log warning)
 	collector.RecordHTTPRequest("POST", "/api/upload", "201", 2*time.Second, 2048)
-	
-	if v, ok := m.RequestsTotal.Value().(int64); !ok || v != 2 {
+
+	if v, ok := m.RequestsTotal().Value().(int64); !ok || v != 2 {
 		t.Error("Expected slow request to be counted")
 	}
 }
@@ -338,27 +338,27 @@ func TestCollector_RecordDBQuery(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	m := metrics.NewMetrics()
 	collector := NewCollector(m, logger)
-	
+
 	// Record normal query
 	collector.RecordDBQuery("SELECT", 10*time.Millisecond, nil)
-	
+
 	// Verify metrics were recorded
-	if v, ok := m.DBQueriesTotal.Value().(int64); !ok || v != 1 {
+	if v, ok := m.DBQueriesTotal().Value().(int64); !ok || v != 1 {
 		t.Error("Expected query to be counted")
 	}
-	
+
 	// Record slow query (should log warning)
 	collector.RecordDBQuery("INSERT", 200*time.Millisecond, nil)
-	
-	if v, ok := m.DBQueriesTotal.Value().(int64); !ok || v != 2 {
+
+	if v, ok := m.DBQueriesTotal().Value().(int64); !ok || v != 2 {
 		t.Error("Expected slow query to be counted")
 	}
-	
+
 	// Record query with error (should log error)
 	err := fmt.Errorf("connection timeout")
 	collector.RecordDBQuery("UPDATE", 50*time.Millisecond, err)
-	
-	if v, ok := m.DBErrors.Value().(int64); !ok || v != 1 {
+
+	if v, ok := m.DBErrors().Value().(int64); !ok || v != 1 {
 		t.Error("Expected error to be counted")
 	}
 }
